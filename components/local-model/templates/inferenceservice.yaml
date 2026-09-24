@@ -6,7 +6,8 @@ metadata:
   labels:
     opendatahub.io/dashboard: "true"
   annotations:
-    serving.kserve.io/deploymentMode: RawDeployment
+    # RHOAI 3.5 name of the former RawDeployment mode (the webhook rewrites the old name).
+    serving.kserve.io/deploymentMode: Standard
     openshift.io/display-name: {{ $m.displayName }}
     # Links the model to its runtime in the RHOAI dashboard.
     opendatahub.io/template-name: {{ $m.runtimeTemplate }}

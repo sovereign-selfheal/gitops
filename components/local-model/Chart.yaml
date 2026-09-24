@@ -1,5 +1,5 @@
 apiVersion: v2
 name: local-model
-description: Local LLM served by vLLM on KServe (RawDeployment), GPU or CPU profile
+description: Local LLM served by vLLM on KServe (Standard deployment mode), GPU or CPU profile
 type: application
 version: 0.1.0
