@@ -54,6 +54,17 @@ efficiency:
     - debug
     - step by step
     - reasoning
+    # Italian (the demo is in Italian). Matching is a lowercase substring, so stems
+    # cover several forms: "confront" matches confronta, confrontando, confronto.
+    - analizz
+    - confront
+    - riassum
+    - spiega perch
+    - dimostr
+    - rifattorizz
+    - passo dopo passo
+    - passo passo
+    - ragionament
   sota_token_budget: 100000         # cumulative SOTA tokens before fallback-to-LOCAL.
                                     # In-memory, resets on pod restart (demo-grade). Kept
                                     # HIGH so the routing demo doesn't trip the cost cap

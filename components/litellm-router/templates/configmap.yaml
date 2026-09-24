@@ -1,5 +1,5 @@
-# Config, hook code and policies, mounted at /app/litellm. The files in files/ are
-# verbatim copies from the old repo (litellm/ and policy/).
+# Config, hook code and policies, mounted at /app/litellm. The hook code in files/ is
+# a verbatim copy from the old repo; the policies are maintained here (see AGENTS.md).
 apiVersion: v1
 kind: ConfigMap
 metadata:

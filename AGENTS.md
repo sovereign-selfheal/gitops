@@ -55,8 +55,10 @@ scripts/ci-values.yaml
   ServingRuntime templates in `redhat-ods-applications`; read them on the target cluster.
 - **Go templates of other tools**: KServe (`{{.Name}}`) and ESO (`{{ .password }}`) use the same syntax as
   Helm. Escape them: `{{ "{{.Name}}" }}`. `scripts/render.sh` checks the KServe one.
-- **Files copied from other repos** (`components/litellm-router/files/`) stay byte-identical to their
-  source. Change them in the source first.
+- **Router code and policies** (`components/litellm-router/files/`) come from the old repo
+  `rhocpai-mvp-routing`, which is now read-only. The hook code (`*.py`) stays byte-identical to it until
+  it moves into the image of the future `router` repo. The policies (`chain.yaml`, `privacy-plus.yaml`)
+  are maintained here: this repo is their source of truth. `chain.yaml` has Italian keywords added.
 - Comments, docs and commit messages in **English**, level B2/C1: short, clear sentences, no idioms.
 
 ## 5. Before you open a PR
