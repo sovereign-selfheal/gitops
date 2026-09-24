@@ -16,6 +16,9 @@ spec:
       annotations:
         # Restart LiteLLM when its config changes (it reads the files only at start).
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        # Restart LiteLLM when the secret store is turned on: env vars from Secrets are
+        # read only at start.
+        secret-store/enabled: {{ dig "secretStore" "enabled" false .Values.global | quote }}
     spec:
       containers:
         - name: litellm

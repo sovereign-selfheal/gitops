@@ -27,20 +27,21 @@ namespaces:
   router: maas-routing
 
 # ----- Secrets (External Secrets Operator) ---------------------------------------
-# The ClusterSecretStore is created by Ansible when the backend is chosen.
+# The ClusterSecretStore is created by Ansible (roles/secrets_bootstrap) when a SOTA key
+# is set; today it reads Secrets that Ansible lands in the namespace
+# sovereign-selfheal-secrets (provider "kubernetes").
 # enabled: false renders no ExternalSecret that needs the store: LiteLLM then
-# starts without the SOTA key (expected: SOTA calls fall back to the local model;
-# not tested yet).
+# starts without the SOTA key (expected: SOTA calls fall back to the local model).
 secretStore:
   enabled: false
   name: sovereign-selfheal
   kind: ClusterSecretStore
-  # Keys in the backend (path + property). See README "Secrets".
+  # Keys in the store (Secret name + key). See README "Secrets".
   sota:
-    key: sovereign-selfheal/sota
+    key: sota
     property: api_key
   classifier:
-    key: sovereign-selfheal/classifier
+    key: classifier
     baseUrlProperty: base_url
     modelProperty: model
     apiKeyProperty: api_key

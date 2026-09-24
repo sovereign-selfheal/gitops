@@ -47,12 +47,17 @@ No Secret is stored in git. The External Secrets Operator creates them:
 | Secret (namespace `maas-routing`) | Keys | Source |
 |---|---|---|
 | `apikey-<tier>-1` | `api_key` (`sk-` + 40 random characters) | ESO `Password` generator, in the cluster, generated once |
-| `sota-provider-secret` | `COMPANY_API_KEY` | External store: key `sovereign-selfheal/sota`, property `api_key` |
-| `classifier-provider-secret` (optional) | `CLASSIFIER_BASE_URL`, `CLASSIFIER_MODEL`, `CLASSIFIER_API_KEY`, `CLASSIFIER_ENABLED`, `CLASSIFIER_GRAY_LOW` | External store: key `sovereign-selfheal/classifier`, properties `base_url`, `model`, `api_key` |
+| `sota-provider-secret` | `COMPANY_API_KEY` | Store: key `sota`, property `api_key` |
+| `classifier-provider-secret` (optional) | `CLASSIFIER_BASE_URL`, `CLASSIFIER_MODEL`, `CLASSIFIER_API_KEY`, `CLASSIFIER_ENABLED`, `CLASSIFIER_GRAY_LOW` | Store: key `classifier`, properties `base_url`, `model`, `api_key` |
 
-The backend of the external store is not chosen yet. Until then, `secretStore.enabled` is `false`: the API
-keys still work, and LiteLLM starts without the SOTA key (the Secret reference is optional). The expected
-result is that SOTA calls fail and LiteLLM falls back to the local model. This is not tested yet.
+The store is the `ClusterSecretStore` `sovereign-selfheal`, created by Ansible (`roles/secrets_bootstrap`).
+Today it uses the ESO provider `kubernetes`: Ansible takes the values from ansible-vault (or from
+AgnosticV) and writes them into Secrets of the namespace `sovereign-selfheal-secrets`; ESO copies them
+here. Another backend (for example HashiCorp Vault) needs only a different store, not changes in this repo.
+
+Without a SOTA key the store does not exist and `secretStore.enabled` is `false`: the API keys still work,
+and LiteLLM starts without the SOTA key (the Secret reference is optional). The expected result is that
+SOTA calls fail and LiteLLM falls back to the local model.
 
 To read an API key:
 
