@@ -10,7 +10,7 @@ global:
     model: openai/example
     servedMatch: ""
   classifier:
-    enabled: false
+    mode: local
     grayLow: "0"
 
 # Custom image: LiteLLM v1.102.0 + fastText language ID model (built from the

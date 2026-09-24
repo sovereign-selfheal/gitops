@@ -23,7 +23,7 @@ here. After that, Argo CD owns every object described in this repo.
   This repo never declares Namespace objects or any other cluster-scoped object.
 - **Values set by the seed** (root Application, `helm.valuesObject`): `appsDomain`, `modelProfile`
   (`gpu` or `cpu`), `sota.enabled`, `sota.apiBase`, `sota.model`, `sota.servedMatch`, `secretStore.enabled`,
-  `classifier.enabled`, and optionally `tiers`. Defaults are in `bootstrap/values.yaml`.
+  `classifier.mode` (`local`, `external` or `off`), and optionally `tiers`. Defaults are in `bootstrap/values.yaml`.
 - **Local-only mode**: without SOTA settings in the ansible-vault, `sota.enabled` is `false` and the alias
   `sota-smart` points to the local model. Every template must keep working in this mode.
 - **Hostnames**: the HTTPRoute here and the Route in Ansible both use `router.<appsDomain>`.

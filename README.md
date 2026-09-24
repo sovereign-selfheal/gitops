@@ -40,6 +40,22 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 | `sota.model` | `openai/<model-id>` | LiteLLM model string of the external model |
 | `sota.servedMatch` | `<model-id>` | Part of the served model id, used by the cost gate |
 | `secretStore.enabled` | `false` | `true` when the ClusterSecretStore exists (see below) |
+| `classifier.mode` | `local` | C2 classifier of the privacy gate: `local` (the local model), `external`, `off` (see below) |
+
+## Privacy classifier (C2)
+
+The privacy gate scores each prompt with rules (regex, lexicons, Presidio NER). When the score is in the
+gray zone and the efficiency gate wants to send the prompt to the SOTA model, an LLM classifier gives an
+extra opinion. `classifier.mode` selects that LLM:
+
+| Mode | Classifier | Notes |
+|---|---|---|
+| `local` (default) | The local model (Granite on GPU) | The prompt never leaves the cluster, also while it is classified. No secret needed |
+| `external` | An external model | Settings from the secret store (`classifier-provider-secret`) |
+| `off` | None | The rules alone decide |
+
+The classifier can only make a prompt more sensitive, never less. On an error or a timeout (8 s), the
+prompt is treated as sensitive and stays on the local model.
 
 ## Local-only mode
 
@@ -57,7 +73,7 @@ No Secret is stored in git. The External Secrets Operator creates them:
 |---|---|---|
 | `apikey-<tier>-1` | `api_key` (`sk-` + 40 random characters) | ESO `Password` generator, in the cluster, generated once |
 | `sota-provider-secret` | `COMPANY_API_KEY` | Store: key `sota`, property `api_key` |
-| `classifier-provider-secret` (optional) | `CLASSIFIER_BASE_URL`, `CLASSIFIER_MODEL`, `CLASSIFIER_API_KEY`, `CLASSIFIER_ENABLED`, `CLASSIFIER_GRAY_LOW` | Store: key `classifier`, properties `base_url`, `model`, `api_key` |
+| `classifier-provider-secret` (only `classifier.mode: external`) | `CLASSIFIER_BASE_URL`, `CLASSIFIER_MODEL`, `CLASSIFIER_API_KEY`, `CLASSIFIER_ENABLED`, `CLASSIFIER_GRAY_LOW` | Store: key `classifier`, properties `base_url`, `model`, `api_key` |
 
 The store is the `ClusterSecretStore` `sovereign-selfheal`, created by Ansible (`roles/secrets_bootstrap`).
 Today it uses the ESO provider `kubernetes`: Ansible takes the values from ansible-vault (or from

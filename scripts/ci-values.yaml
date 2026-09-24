@@ -8,4 +8,4 @@ sota:
 secretStore:
   enabled: true
 classifier:
-  enabled: true
+  mode: external

@@ -34,6 +34,17 @@ spec:
               value: /app/litellm
             - name: PYTHONPATH
               value: /app/litellm
+            {{- if eq .Values.global.classifier.mode "local" }}
+            # C2 classifier = the local model: the prompt never leaves the cluster.
+            - name: CLASSIFIER_ENABLED
+              value: "1"
+            - name: CLASSIFIER_BASE_URL
+              value: {{ printf "http://%s-predictor.%s.svc.cluster.local/v1" .Values.global.localModel.name .Values.global.namespaces.models | quote }}
+            - name: CLASSIFIER_MODEL
+              value: {{ .Values.global.localModel.name | quote }}
+            - name: CLASSIFIER_GRAY_LOW
+              value: {{ .Values.global.classifier.grayLow | quote }}
+            {{- end }}
             {{- with .Values.global.sota.servedMatch }}
             # Overrides sota_served_match in chain.yaml (cost gate).
             - name: SOTA_SERVED_MATCH
@@ -45,7 +56,7 @@ spec:
             - secretRef:
                 name: sota-provider-secret
                 optional: true
-            # C2 classifier settings (component secrets, only when enabled).
+            # External C2 classifier settings (component secrets, classifier.mode: external).
             - secretRef:
                 name: classifier-provider-secret
                 optional: true

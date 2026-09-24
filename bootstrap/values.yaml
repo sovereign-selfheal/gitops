@@ -48,9 +48,15 @@ secretStore:
     modelProperty: model
     apiKeyProperty: api_key
 
-# Optional C2 classifier (LLM) of the privacy gate. Needs secretStore.enabled.
+# C2 classifier (LLM) of the privacy gate. It runs only in the gray zone of the privacy
+# score, when a prompt is about to go to the SOTA model.
+#   local:    the local model (Granite on GPU) classifies; the prompt never leaves the cluster
+#   external: an external model, settings from the secret store (secretStore.enabled needed)
+#   off:      no classifier, the rules alone decide
 classifier:
-  enabled: false
+  mode: local
+  # Rules score below grayLow = clearly benign, no classifier call. "0" classifies every
+  # prompt below the threshold, to catch sensitive content without keywords.
   grayLow: "0"
 
 # API-key tiers (Authorino) and their token budgets (TokenRateLimitPolicy).
