@@ -10,6 +10,7 @@ global:
     model: openai/example
     servedMatch: ""
     timeout: 300
+    reasoning: false
   classifier:
     mode: local
     grayLow: "0"

@@ -17,6 +17,12 @@ sota:
   # Seconds LiteLLM waits for one SOTA call. A reasoning model with a large token budget
   # can take about 3 minutes (the default of the other models is 120s).
   timeout: 300
+  # false (default): LiteLLM asks the SOTA model to answer without reasoning
+  # (chat_template_kwargs.enable_thinking=false, for vLLM-based providers and models with a
+  # thinking switch such as Qwen3). With reasoning, the model often spent the whole token
+  # budget on hidden reasoning and returned an empty answer. true: send nothing, the model
+  # decides (also the right choice for providers that do not accept this parameter).
+  reasoning: false
 
 # ----- Repository and Argo CD ----------------------------------------------------
 repo:

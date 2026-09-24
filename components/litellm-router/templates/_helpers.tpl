@@ -17,6 +17,12 @@ model_list:
       api_base: {{ required "global.sota.apiBase is required" .Values.global.sota.apiBase | quote }}
       api_key: os.environ/COMPANY_API_KEY
       timeout: {{ .Values.global.sota.timeout | default 300 }}
+      {{- if not .Values.global.sota.reasoning }}
+      # Reasoning off (sota.reasoning: false): answer directly.
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
+      {{- end }}
   {{- else }}
   # Local-only mode (no SOTA configured): the policies still route to sota-smart,
   # but it is the local model.

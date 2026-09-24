@@ -39,6 +39,7 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 | `sota.apiBase` | `https://provider.example.com/v1` | External OpenAI-compatible endpoint |
 | `sota.model` | `openai/<model-id>` | LiteLLM model string of the external model |
 | `sota.servedMatch` | `<model-id>` | Part of the served model id, used by the cost gate |
+| `sota.reasoning` | `false` | `false`: the SOTA model answers without reasoning (see "Long answers and streaming"); `true`: the model decides |
 | `secretStore.enabled` | `false` | `true` when the ClusterSecretStore exists (see below) |
 | `classifier.mode` | `local` | C2 classifier of the privacy gate: `local` (the local model), `external`, `off` (see below) |
 
@@ -49,6 +50,10 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 - Without streaming, no byte flows until the answer is complete, so every hop needs a long idle timeout.
   The `ansible` repo sets 10 minutes on the Route and on the AWS load balancer of the ingress (the AWS
   default is 60 s).
+- **Reasoning is off by default** (`sota.reasoning: false`). With reasoning on, the tested SOTA model often
+  spent the whole token budget on hidden reasoning and returned an empty answer, and its provider sends
+  nothing while the model reasons, even with streaming. Set `sota.reasoning: true` (Ansible:
+  `sota_reasoning: true`) to show a reasoning model; then give the calls a large token budget.
 - **Clients should use streaming** (`"stream": true`): the text arrives while it is generated, and no
   idle timeout applies. LiteLLM adds the token usage at the end of every stream
   (`always_include_stream_usage`), so the token limits count streaming calls too.
