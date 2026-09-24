@@ -1,0 +1,23 @@
+# `global` is passed by the bootstrap chart (see bootstrap/templates/_helpers.tpl).
+# The defaults below exist only for `helm lint`; real values come from bootstrap.
+global:
+  appsDomain: apps.example.com
+  namespaces:
+    models: local-models
+    router: maas-routing
+  localModel:
+    name: example-local
+    displayName: Example model
+    runtime: vllm-cpu-x86-runtime
+    runtimeDisplayName: vLLM CPU (x86) ServingRuntime for KServe
+    runtimeTemplate: vllm-cpu-x86-runtime-template
+    runtimeImage: registry.example.com/vllm@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    runtimeVersion: v0.0.0
+    storageUri: oci://registry.example.com/model@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    extraArgs: []
+    env: []
+    gpu: 0
+    resources: {}
+
+# Size of /dev/shm for vLLM (shared memory between processes).
+shmSizeLimit: 2Gi

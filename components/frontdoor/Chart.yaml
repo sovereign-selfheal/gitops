@@ -1,0 +1,5 @@
+apiVersion: v2
+name: frontdoor
+description: Governed entry point - HTTPRoute on the RHOAI gateway, API-key auth and token rate limits (Kuadrant)
+type: application
+version: 0.1.0

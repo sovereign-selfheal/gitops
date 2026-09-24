@@ -1,0 +1,44 @@
+{{- $m := .Values.global.localModel }}
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: {{ $m.name }}
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    serving.kserve.io/deploymentMode: RawDeployment
+    openshift.io/display-name: {{ $m.displayName }}
+    # Links the model to its runtime in the RHOAI dashboard.
+    opendatahub.io/template-name: {{ $m.runtimeTemplate }}
+    opendatahub.io/template-display-name: {{ $m.runtimeDisplayName }}
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 1
+    {{- if gt (int $m.gpu) 0 }}
+    # GPU nodes carry this taint (roles/gpu_node_prep in the ansible repo).
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    {{- end }}
+    model:
+      runtime: {{ $m.runtime }}
+      modelFormat:
+        name: vLLM
+      storageUri: {{ $m.storageUri }}
+      resources:
+        requests:
+          {{- with $m.resources.requests }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- if gt (int $m.gpu) 0 }}
+          nvidia.com/gpu: {{ $m.gpu | quote }}
+          {{- end }}
+        limits:
+          {{- with $m.resources.limits }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- if gt (int $m.gpu) 0 }}
+          nvidia.com/gpu: {{ $m.gpu | quote }}
+          {{- end }}

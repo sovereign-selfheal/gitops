@@ -1,0 +1,15 @@
+# `global` is passed by the bootstrap chart. The defaults below exist only for `helm lint`.
+global:
+  appsDomain: apps.example.com
+  tiers:
+    - name: example
+      tokens: 1000
+      window: 60s
+
+# Gateway created by the ansible repo (RHOAI gateway in openshift-ingress).
+gateway:
+  name: openshift-ai-inference
+  namespace: openshift-ingress
+# Public hostname: <hostPrefix>.<appsDomain>. The ansible repo creates the
+# passthrough Route with the same hostname.
+hostPrefix: router

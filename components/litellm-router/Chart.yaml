@@ -1,0 +1,5 @@
+apiVersion: v2
+name: litellm-router
+description: LiteLLM proxy with the chain policy engine (efficiency gate, then privacy gate)
+type: application
+version: 0.1.0

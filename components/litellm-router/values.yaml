@@ -1,0 +1,24 @@
+# `global` is passed by the bootstrap chart. The defaults below exist only for `helm lint`.
+global:
+  namespaces:
+    models: local-models
+  localModel:
+    name: example-local
+  sota:
+    apiBase: https://sota.example.com/v1
+    model: openai/example
+    servedMatch: ""
+  classifier:
+    enabled: false
+    grayLow: "0"
+
+# Custom image: LiteLLM v1.102.0 + fastText language ID model (built from the
+# old repo, images/litellm-fasttext/Containerfile).
+image: quay.io/asalvati/litellm-privacy-plus:0.2
+resources:
+  requests:
+    cpu: 200m
+    memory: 1Gi
+  limits:
+    cpu: "1"
+    memory: 2Gi

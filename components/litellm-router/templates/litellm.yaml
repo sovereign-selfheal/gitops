@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  labels:
+    app: litellm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litellm
+  template:
+    metadata:
+      labels:
+        app: litellm
+      annotations:
+        # Restart LiteLLM when its config changes (it reads the files only at start).
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: litellm
+          image: {{ .Values.image }}
+          imagePullPolicy: IfNotPresent
+          command: ["litellm"]
+          args: ["--config", "/app/litellm/config-chain.yaml", "--port", "4000"]
+          ports:
+            - name: http
+              containerPort: 4000
+          env:
+            - name: POLICY_DIR
+              value: /app/litellm
+            - name: PYTHONPATH
+              value: /app/litellm
+            {{- with .Values.global.sota.servedMatch }}
+            # Overrides sota_served_match in chain.yaml (cost gate).
+            - name: SOTA_SERVED_MATCH
+              value: {{ . | quote }}
+            {{- end }}
+          envFrom:
+            # COMPANY_API_KEY. Optional: without it SOTA calls fail and LiteLLM
+            # falls back to the local model.
+            - secretRef:
+                name: sota-provider-secret
+                optional: true
+            # C2 classifier settings (component secrets, only when enabled).
+            - secretRef:
+                name: classifier-provider-secret
+                optional: true
+          volumeMounts:
+            - name: litellm-config
+              mountPath: /app/litellm
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /health/liveliness
+              port: 4000
+            periodSeconds: 10
+            failureThreshold: 18
+          readinessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: 4000
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: 4000
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+      volumes:
+        - name: litellm-config
+          configMap:
+            name: litellm-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+  labels:
+    app: litellm
+spec:
+  selector:
+    app: litellm
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# LiteLLM is reachable only through the gateway (openshift-ingress): no bypass.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: litellm-gateway-only
+spec:
+  podSelector:
+    matchLabels:
+      app: litellm
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+      ports:
+        - protocol: TCP
+          port: 4000

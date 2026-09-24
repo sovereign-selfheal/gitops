@@ -1,0 +1,51 @@
+---
+name: lint
+
+"on":
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # Argo CD renders the charts with Helm 3: test with the same major version.
+  HELM_VERSION: v3.22.0
+  KUBECONFORM_VERSION: v0.8.0
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: |
+          pip install yamllint pyyaml
+          curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" | tar xz -C /tmp
+          sudo install /tmp/linux-amd64/helm /usr/local/bin/helm
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" | tar xz -C /tmp
+          sudo install /tmp/kubeconform /usr/local/bin/kubeconform
+
+      - name: yamllint
+        run: yamllint .
+
+      - name: helm lint
+        run: for chart in bootstrap components/*/; do helm lint "${chart}"; done
+
+      - name: shellcheck
+        run: shellcheck scripts/*.sh
+
+      - name: Render and validate (gpu and cpu profiles)
+        run: |
+          for profile in gpu cpu; do
+            scripts/render.sh "${profile}" "rendered/${profile}"
+            kubeconform -summary -ignore-missing-schemas "rendered/${profile}"/*.yaml
+          done

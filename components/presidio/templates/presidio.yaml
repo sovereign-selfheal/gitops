@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: presidio-analyzer
+  labels:
+    app: presidio-analyzer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: presidio-analyzer
+  template:
+    metadata:
+      labels:
+        app: presidio-analyzer
+    spec:
+      containers:
+        - name: presidio-analyzer
+          image: {{ .Values.image }}
+          imagePullPolicy: IfNotPresent
+          command: ["gunicorn"]
+          args:
+            - "-w"
+            - "1"
+            - "--threads"
+            - "4"
+            - "--worker-class"
+            - "gthread"
+            - "--timeout"
+            - "20"
+            - "--graceful-timeout"
+            - "10"
+            - "-b"
+            - "0.0.0.0:3000"
+            - "app:create_app()"
+          ports:
+            - name: http
+              containerPort: 3000
+          # Loading the two NER models can take up to ~6 minutes.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            periodSeconds: 10
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: presidio-analyzer
+  labels:
+    app: presidio-analyzer
+spec:
+  selector:
+    app: presidio-analyzer
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+# Only LiteLLM may call Presidio, and Presidio has no egress at all.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: presidio-analyzer-lockdown
+spec:
+  podSelector:
+    matchLabels:
+      app: presidio-analyzer
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: litellm
+      ports:
+        - protocol: TCP
+          port: 3000

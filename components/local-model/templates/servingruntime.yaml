@@ -1,0 +1,56 @@
+{{- $m := .Values.global.localModel }}
+# Copy of the RHOAI template {{ $m.runtimeTemplate }}, with the same image digest.
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: {{ $m.runtime }}
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/runtime-version: {{ $m.runtimeVersion }}
+    opendatahub.io/template-name: {{ $m.runtimeTemplate }}
+    openshift.io/display-name: {{ $m.runtimeDisplayName }}
+    {{- if gt (int $m.gpu) 0 }}
+    opendatahub.io/recommended-accelerators: '["nvidia.com/gpu"]'
+    {{- end }}
+spec:
+  annotations:
+    opendatahub.io/kserve-runtime: vllm
+    prometheus.io/path: /metrics
+    prometheus.io/port: "8080"
+  containers:
+    - name: kserve-container
+      image: {{ $m.runtimeImage }}
+      command:
+        - python
+        - -m
+        - vllm.entrypoints.openai.api_server
+      args:
+        - --port=8080
+        - --model=/mnt/models
+        # KServe placeholder, replaced with the InferenceService name (not a Helm value).
+        - --served-model-name={{ "{{.Name}}" }}
+        {{- range $m.extraArgs }}
+        - {{ . }}
+        {{- end }}
+      env:
+        - name: HF_HOME
+          value: /tmp/hf_home
+        {{- with $m.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      ports:
+        - containerPort: 8080
+          protocol: TCP
+      volumeMounts:
+        - name: shm
+          mountPath: /dev/shm
+  volumes:
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: {{ .Values.shmSizeLimit }}
+  multiModel: false
+  supportedModelFormats:
+    - name: vLLM
+      autoSelect: true

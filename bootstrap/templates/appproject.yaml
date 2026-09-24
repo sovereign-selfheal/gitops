@@ -1,0 +1,22 @@
+{{- /* Limits the component Applications to the two workload namespaces. */ -}}
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ .Values.argocd.project }}
+  namespace: {{ .Values.argocd.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Workloads of the Sovereign Self-Healing Platform demo
+  sourceRepos:
+    - {{ .Values.repo.url }}
+  destinations:
+    {{- range $key, $ns := .Values.namespaces }}
+    - server: https://kubernetes.default.svc
+      namespace: {{ $ns }}
+    {{- end }}
+  # No cluster-scoped objects: namespaces, CRDs and RBAC belong to the ansible repo.
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

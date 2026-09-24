@@ -1,0 +1,5 @@
+apiVersion: v2
+name: presidio
+description: Presidio analyzer (EN + IT NER) used by the privacy gate of the router
+type: application
+version: 0.1.0

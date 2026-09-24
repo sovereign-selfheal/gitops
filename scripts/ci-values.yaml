@@ -1,0 +1,10 @@
+# Example per-cluster values, used by scripts/render.sh and CI only.
+appsDomain: apps.cluster.example.com
+sota:
+  apiBase: https://sota.example.com/v1
+  model: openai/example-sota
+  servedMatch: example-sota
+secretStore:
+  enabled: true
+classifier:
+  enabled: true

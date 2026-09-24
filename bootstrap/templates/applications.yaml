@@ -1,0 +1,38 @@
+{{- $global := include "bootstrap.global" . | fromYaml }}
+{{- range $name, $c := .Values.components }}
+{{- if $c.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Values.argocd.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ $c.wave | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ $.Values.argocd.project }}
+  source:
+    repoURL: {{ $.Values.repo.url }}
+    targetRevision: {{ $.Values.repo.targetRevision }}
+    path: components/{{ $name }}
+    helm:
+      valuesObject:
+        global:
+          {{- toYaml $global | nindent 10 }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ required (printf "unknown namespaceRef for %s" $name) (index $.Values.namespaces $c.namespaceRef) }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+{{- end }}
+{{- end }}

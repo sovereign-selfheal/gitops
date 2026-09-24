@@ -1,0 +1,48 @@
+# Workaround for RHOAIENG-70137 (still needed on RHOAI 3.5): allow traffic to the
+# predictor on :8080. The host-network group was needed on BareMetal; it is
+# harmless on AWS and kept for other platforms.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-predictors
+spec:
+  podSelector:
+    matchLabels:
+      component: predictor
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              policy-group.network.openshift.io/host-network: ""
+        - namespaceSelector:
+            matchLabels:
+              policy-group.network.openshift.io/ingress: ""
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: monitoring
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# LiteLLM (router namespace) calls the predictor on :8080.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-router
+spec:
+  podSelector:
+    matchLabels:
+      component: predictor
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.global.namespaces.router }}
+      ports:
+        - protocol: TCP
+          port: 8080

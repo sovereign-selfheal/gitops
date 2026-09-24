@@ -1,0 +1,12 @@
+global: {}
+
+# Custom image: presidio-analyzer 2.2.364 + Italian spaCy model (built from the
+# old repo, images/presidio-multilang/Containerfile).
+image: quay.io/asalvati/presidio-analyzer-multilang:0.2
+resources:
+  requests:
+    cpu: 200m
+    memory: 2Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi

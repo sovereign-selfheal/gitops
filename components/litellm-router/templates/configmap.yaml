@@ -1,0 +1,15 @@
+# Config, hook code and policies, mounted at /app/litellm. The files in files/ are
+# verbatim copies from the old repo (litellm/ and policy/).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+  labels:
+    app: litellm
+data:
+  config-chain.yaml: |
+    {{- include "litellm-router.config" . | nindent 4 }}
+  {{- range $path, $_ := .Files.Glob "files/*" }}
+  {{ base $path }}: |
+    {{- $.Files.Get $path | nindent 4 }}
+  {{- end }}

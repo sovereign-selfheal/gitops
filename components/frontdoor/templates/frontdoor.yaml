@@ -1,0 +1,77 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: litellm
+  labels:
+    app: litellm
+spec:
+  parentRefs:
+    - name: {{ .Values.gateway.name }}
+      namespace: {{ .Values.gateway.namespace }}
+  hostnames:
+    - {{ printf "%s.%s" .Values.hostPrefix (required "global.appsDomain is required" .Values.global.appsDomain) }}
+  rules:
+    - filters:
+        # The client API key must not reach LiteLLM.
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove:
+              - Authorization
+      backendRefs:
+        - name: litellm
+          port: 80
+---
+# API-key authentication: keys are Secrets labelled app=maas-litellm (component secrets).
+# Authorino sets x-team from the key's maas-group label; this overwrites any
+# x-team header sent by the client.
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: litellm-apikey
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: litellm
+  rules:
+    authentication:
+      api-key:
+        apiKey:
+          allNamespaces: true
+          selector:
+            matchLabels:
+              app: maas-litellm
+    response:
+      success:
+        headers:
+          x-team:
+            plain:
+              expression: auth.identity.metadata.labels["maas-group"]
+        filters:
+          tier:
+            json:
+              properties:
+                group:
+                  expression: auth.identity.metadata.labels["maas-group"]
+---
+# Token budget per tier (counted on LLM usage tokens).
+apiVersion: kuadrant.io/v1alpha1
+kind: TokenRateLimitPolicy
+metadata:
+  name: litellm-tokens
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: litellm
+  limits:
+    {{- range .Values.global.tiers }}
+    {{ .name }}-tier:
+      when:
+        - predicate: {{ printf "auth.tier.group == %q" .name | squote }}
+      counters:
+        - expression: auth.tier.group
+      rates:
+        - limit: {{ .tokens }}
+          window: {{ .window }}
+    {{- end }}

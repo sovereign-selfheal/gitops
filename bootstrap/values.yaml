@@ -1,0 +1,136 @@
+# Values of the ROOT Application. Ansible (playbooks/30-gitops-seed.yml in the
+# `ansible` repo) creates the root Application and sets the per-cluster values
+# below with `helm.valuesObject`. Everything else is a default of this repo.
+
+# ----- Set by the seed (per cluster) ---------------------------------------------
+# Apps domain of the cluster (ingresses.config/cluster .spec.domain).
+appsDomain: ""
+# Local model profile: `gpu` (Granite on a GPU node) or `cpu` (small Qwen on CPU).
+modelProfile: gpu
+# External "SOTA" model, OpenAI compatible.
+sota:
+  apiBase: ""        # e.g. https://<provider>/v1
+  model: ""          # LiteLLM model string, e.g. openai/<model-id>
+  servedMatch: ""    # substring of the served model id, used by the cost gate (env SOTA_SERVED_MATCH)
+
+# ----- Repository and Argo CD ----------------------------------------------------
+repo:
+  url: https://github.com/sovereign-selfheal/gitops.git
+  targetRevision: main
+argocd:
+  namespace: openshift-gitops
+  project: sovereign-selfheal
+
+# Namespaces are created by Ansible (with the argocd.argoproj.io/managed-by label).
+namespaces:
+  models: local-models
+  router: maas-routing
+
+# ----- Secrets (External Secrets Operator) ---------------------------------------
+# The ClusterSecretStore is created by Ansible when the backend is chosen.
+# enabled: false renders no ExternalSecret that needs the store: LiteLLM then
+# starts without the SOTA key (expected: SOTA calls fall back to the local model;
+# not tested yet).
+secretStore:
+  enabled: false
+  name: sovereign-selfheal
+  kind: ClusterSecretStore
+  # Keys in the backend (path + property). See README "Secrets".
+  sota:
+    key: sovereign-selfheal/sota
+    property: api_key
+  classifier:
+    key: sovereign-selfheal/classifier
+    baseUrlProperty: base_url
+    modelProperty: model
+    apiKeyProperty: api_key
+
+# Optional C2 classifier (LLM) of the privacy gate. Needs secretStore.enabled.
+classifier:
+  enabled: false
+  grayLow: "0"
+
+# API-key tiers (Authorino) and their token budgets (TokenRateLimitPolicy).
+# The keys are generated in the cluster by an ESO Password generator.
+tiers:
+  - name: research
+    tokens: 100000
+    window: 120s
+  - name: legal
+    tokens: 200
+    window: 120s
+
+# ----- Local model profiles --------------------------------------------------------
+# Images are pinned by digest, resolved on the date in the comment.
+localModel:
+  profiles:
+    gpu:
+      name: granite-local
+      displayName: Granite 3.3 8B Instruct (local, vLLM GPU)
+      runtime: vllm-cuda-runtime
+      runtimeDisplayName: vLLM NVIDIA GPU ServingRuntime for KServe
+      runtimeTemplate: vllm-cuda-runtime-template
+      # RHOAI 3.5.1 template vllm-cuda-runtime-template, resolved on OCP 4.22.14 on 2026-09-24
+      runtimeImage: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:c056e61672b6aea489ad5dde0bd2f8497230f5333e87f7cf6c494eba3bfdc808
+      runtimeVersion: v0.24.0
+      # tag granite-3.3-8b-instruct-20260805t2227z, resolved on quay.io on 2026-09-24
+      storageUri: oci://quay.io/redhat-ai-services/modelcar-catalog@sha256:735e0ff14f64d720566e24f21d8e5fa435f8dfcc3416b7614666f8f7d1fd8191
+      # Granite defaults to a 128k context: its KV cache does not fit in 24 GB (NVIDIA L4).
+      extraArgs:
+        - --max-model-len=8192
+      env: []
+      gpu: 1
+      resources:
+        requests:
+          cpu: "1"
+          memory: 6Gi
+        limits:
+          cpu: "3"
+          memory: 12Gi
+    cpu:
+      name: qwen25-05b-local
+      displayName: Qwen2.5 0.5B Instruct (local, vLLM CPU)
+      runtime: vllm-cpu-x86-runtime
+      runtimeDisplayName: vLLM CPU (x86) ServingRuntime for KServe
+      runtimeTemplate: vllm-cpu-x86-runtime-template
+      # RHOAI 3.5.1 template vllm-cpu-x86-runtime-template, resolved on OCP 4.22.14 on 2026-09-24
+      runtimeImage: registry.redhat.io/rhaii/vllm-cpu-rhel9@sha256:7a28b867955055a8836ea2a78e70b8bad63c1ee50e8a5f8dd95d1194f20ec489
+      runtimeVersion: v0.24.0
+      # tag qwen2.5-0.5b-instruct-20260810t1646z, resolved on quay.io on 2026-09-24
+      storageUri: oci://quay.io/redhat-ai-services/modelcar-catalog@sha256:e20441c23be795838409137576b9016e6bc941eec79e5765cf9de6319c0ec769
+      extraArgs: []
+      env:
+        - name: VLLM_CPU_KVCACHE_SPACE
+          value: "4"
+      gpu: 0
+      resources:
+        requests:
+          cpu: "1"
+          memory: 2Gi
+        limits:
+          cpu: "4"
+          memory: 8Gi
+
+# ----- Components (one Argo CD Application each) --------------------------------
+# wave: Argo CD sync wave of the Application; namespaceRef: key in `namespaces` above.
+components:
+  secrets:
+    enabled: true
+    wave: 0
+    namespaceRef: router
+  local-model:
+    enabled: true
+    wave: 1
+    namespaceRef: models
+  presidio:
+    enabled: true
+    wave: 1
+    namespaceRef: router
+  litellm-router:
+    enabled: true
+    wave: 2
+    namespaceRef: router
+  frontdoor:
+    enabled: true
+    wave: 3
+    namespaceRef: router

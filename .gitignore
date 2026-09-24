@@ -1,0 +1,15 @@
+# Rendered manifests (scripts/render.sh)
+rendered/
+
+# Credentials: never commit
+*.kubeconfig
+kubeconfig
+*.pem
+*.key
+.secrets/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+__pycache__/
