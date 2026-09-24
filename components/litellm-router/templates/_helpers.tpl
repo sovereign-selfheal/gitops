@@ -9,12 +9,22 @@ model_list:
       model: openai/{{ $local }}
       api_base: {{ $base }}
       api_key: "in-cluster-no-auth"
+  {{- if .Values.global.sota.enabled }}
   # SOTA tier: external OpenAI-compatible provider.
   - model_name: sota-smart
     litellm_params:
       model: {{ required "global.sota.model is required" .Values.global.sota.model | quote }}
       api_base: {{ required "global.sota.apiBase is required" .Values.global.sota.apiBase | quote }}
       api_key: os.environ/COMPANY_API_KEY
+  {{- else }}
+  # Local-only mode (no SOTA configured): the policies still route to sota-smart,
+  # but it is the local model.
+  - model_name: sota-smart
+    litellm_params:
+      model: openai/{{ $local }}
+      api_base: {{ $base }}
+      api_key: "in-cluster-no-auth"
+  {{- end }}
   # The model clients call; the policy hook picks the real target.
   - model_name: auto
     litellm_params:

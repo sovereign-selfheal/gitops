@@ -35,10 +35,19 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 |---|---|---|
 | `appsDomain` | `apps.cluster.example.com` | Apps domain; the router answers on `router.<appsDomain>` |
 | `modelProfile` | `gpu` | `gpu`: Granite 3.3 8B Instruct on a GPU node; `cpu`: Qwen2.5 0.5B on CPU |
+| `sota.enabled` | `true` | `false` = local-only mode (see below) |
 | `sota.apiBase` | `https://provider.example.com/v1` | External OpenAI-compatible endpoint |
 | `sota.model` | `openai/<model-id>` | LiteLLM model string of the external model |
 | `sota.servedMatch` | `<model-id>` | Part of the served model id, used by the cost gate |
 | `secretStore.enabled` | `false` | `true` when the ClusterSecretStore exists (see below) |
+
+## Local-only mode
+
+The external SOTA model is optional. Its settings and key come from the ansible-vault of the `ansible`
+repo. Without them the seed sets `sota.enabled: false`, and the router runs in **local-only mode**:
+the alias `sota-smart` points to the local model, so the gates and policies work as usual, but every
+request is served by the local model. The router logs still show `routed_to: sota-smart` when a gate
+chooses "SOTA".
 
 ## Secrets
 

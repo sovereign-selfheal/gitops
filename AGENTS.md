@@ -15,15 +15,17 @@ here. After that, Argo CD owns every object described in this repo.
 
 | Owner | Objects |
 |---|---|
-| `ansible` | Operators, DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, GPU nodes, the namespaces `local-models` and `maas-routing`, the ESO operator, the `ClusterSecretStore` and its credential Secret, Argo CD settings, the root Application |
+| `ansible` | Operators, DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, GPU nodes, the namespaces `local-models` and `maas-routing`, the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), Argo CD settings, the root Application |
 | `gitops` (this repo) | Every object inside `local-models` and `maas-routing` |
 
 - **Namespaces** are created by Ansible with the label `argocd.argoproj.io/managed-by: openshift-gitops`.
   The default Argo CD instance can manage only namespaces with this label, and it cannot create Namespaces.
   This repo never declares Namespace objects or any other cluster-scoped object.
 - **Values set by the seed** (root Application, `helm.valuesObject`): `appsDomain`, `modelProfile`
-  (`gpu` or `cpu`), `sota.apiBase`, `sota.model`, `sota.servedMatch`, and optionally `secretStore.*`,
-  `classifier.*`, `tiers`. Defaults are in `bootstrap/values.yaml`.
+  (`gpu` or `cpu`), `sota.enabled`, `sota.apiBase`, `sota.model`, `sota.servedMatch`, `secretStore.enabled`,
+  `classifier.enabled`, and optionally `tiers`. Defaults are in `bootstrap/values.yaml`.
+- **Local-only mode**: without SOTA settings in the ansible-vault, `sota.enabled` is `false` and the alias
+  `sota-smart` points to the local model. Every template must keep working in this mode.
 - **Hostnames**: the HTTPRoute here and the Route in Ansible both use `router.<appsDomain>`.
 - **Secrets**: never in git. The External Secrets Operator creates them, either from the external store
   or from an in-cluster generator (see README "Secrets").

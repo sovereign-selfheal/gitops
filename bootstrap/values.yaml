@@ -7,8 +7,10 @@
 appsDomain: ""
 # Local model profile: `gpu` (Granite on a GPU node) or `cpu` (small Qwen on CPU).
 modelProfile: gpu
-# External "SOTA" model, OpenAI compatible.
+# External "SOTA" model, OpenAI compatible. enabled: false = local-only mode: the alias
+# sota-smart points to the local model, so every request is served locally.
 sota:
+  enabled: false
   apiBase: ""        # e.g. https://<provider>/v1
   model: ""          # LiteLLM model string, e.g. openai/<model-id>
   servedMatch: ""    # substring of the served model id, used by the cost gate (env SOTA_SERVED_MATCH)
