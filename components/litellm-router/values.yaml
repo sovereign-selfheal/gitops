@@ -9,6 +9,7 @@ global:
     apiBase: https://sota.example.com/v1
     model: openai/example
     servedMatch: ""
+    timeout: 300
   classifier:
     mode: local
     grayLow: "0"

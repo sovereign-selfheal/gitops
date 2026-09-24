@@ -14,6 +14,9 @@ sota:
   apiBase: ""        # e.g. https://<provider>/v1
   model: ""          # LiteLLM model string, e.g. openai/<model-id>
   servedMatch: ""    # substring of the served model id, used by the cost gate (env SOTA_SERVED_MATCH)
+  # Seconds LiteLLM waits for one SOTA call. A reasoning model with a large token budget
+  # can take about 3 minutes (the default of the other models is 120s).
+  timeout: 300
 
 # ----- Repository and Argo CD ----------------------------------------------------
 repo:

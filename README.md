@@ -42,6 +42,17 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 | `secretStore.enabled` | `false` | `true` when the ClusterSecretStore exists (see below) |
 | `classifier.mode` | `local` | C2 classifier of the privacy gate: `local` (the local model), `external`, `off` (see below) |
 
+## Long answers and streaming
+
+- A SOTA model with reasoning and a large token budget can take a few minutes. LiteLLM waits
+  `sota.timeout` seconds (default 300) for one SOTA call; the other models keep 120 s.
+- Without streaming, no byte flows until the answer is complete, so every hop needs a long idle timeout.
+  The `ansible` repo sets 10 minutes on the Route and on the AWS load balancer of the ingress (the AWS
+  default is 60 s).
+- **Clients should use streaming** (`"stream": true`): the text arrives while it is generated, and no
+  idle timeout applies. LiteLLM adds the token usage at the end of every stream
+  (`always_include_stream_usage`), so the token limits count streaming calls too.
+
 ## Privacy classifier (C2)
 
 The privacy gate scores each prompt with rules (regex, lexicons, Presidio NER). When the score is in the

@@ -16,6 +16,7 @@ model_list:
       model: {{ required "global.sota.model is required" .Values.global.sota.model | quote }}
       api_base: {{ required "global.sota.apiBase is required" .Values.global.sota.apiBase | quote }}
       api_key: os.environ/COMPANY_API_KEY
+      timeout: {{ .Values.global.sota.timeout | default 300 }}
   {{- else }}
   # Local-only mode (no SOTA configured): the policies still route to sota-smart,
   # but it is the local model.
@@ -40,4 +41,9 @@ litellm_settings:
 
 router_settings:
   fallbacks: [{"sota-smart": ["local-fast"]}]
+
+general_settings:
+  # Streaming answers end with the token usage, even if the client does not ask for it:
+  # the TokenRateLimitPolicy counts tokens from that usage.
+  always_include_stream_usage: true
 {{- end }}
