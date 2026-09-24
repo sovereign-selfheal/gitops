@@ -65,11 +65,12 @@ efficiency:
     - passo dopo passo
     - passo passo
     - ragionament
-  sota_token_budget: 100000         # cumulative SOTA tokens before fallback-to-LOCAL.
-                                    # In-memory, resets on pod restart (demo-grade). Kept
-                                    # HIGH so the routing demo doesn't trip the cost cap
-                                    # after a couple of SOTA calls. Set to 0 to disable the
-                                    # cap entirely; lower it to deliberately show fallback.
+  sota_token_budget: 2000000        # cumulative SOTA tokens before fallback-to-LOCAL.
+                                    # In-memory, resets on pod restart (demo-grade). A safety
+                                    # net only: the per-tier limits of the gateway are the
+                                    # real budget. 100000 was reached after 30-60 SOTA answers
+                                    # in a demo day, then every request silently went LOCAL.
+                                    # Set to 0 to disable the cap; lower it to show fallback.
 
 # --- Gate 2 — privacy --------------------------------------------------------
 # Reuses the hardened privacy-plus engine (A regex+validators, B lexicons,

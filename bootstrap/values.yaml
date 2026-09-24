@@ -78,7 +78,7 @@ classifier:
 #             that answers sent one after the other add up
 tiers:
   - name: research
-    tokens: 50000
+    tokens: 100000
     window: 1m
   - name: legal
     tokens: 5000
