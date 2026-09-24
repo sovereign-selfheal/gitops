@@ -5,7 +5,7 @@ metadata:
   labels:
     app: presidio-analyzer
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
       app: presidio-analyzer
@@ -14,6 +14,16 @@ spec:
       labels:
         app: presidio-analyzer
     spec:
+      # Prefer one replica per node. "Preferred": it never blocks scheduling.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: presidio-analyzer
       containers:
         - name: presidio-analyzer
           image: {{ .Values.image }}
@@ -79,6 +89,20 @@ spec:
     - name: http
       port: 3000
       targetPort: http
+---
+# Node drains (for example a cluster upgrade) evict one replica at a time, so the other one
+# keeps serving. maxUnavailable (not minAvailable) does not block drains with 1 replica.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: presidio-analyzer
+  labels:
+    app: presidio-analyzer
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: presidio-analyzer
 ---
 # Only LiteLLM may call Presidio, and Presidio has no egress at all.
 apiVersion: networking.k8s.io/v1

@@ -18,6 +18,9 @@ global:
 # Custom image: LiteLLM v1.102.0 + fastText language ID model (built from the
 # old repo, images/litellm-fasttext/Containerfile).
 image: quay.io/asalvati/litellm-privacy-plus:0.2
+# Two replicas, preferably on different nodes. The SOTA token counter of the policy hook
+# (sota_token_budget in files/chain.yaml) is per pod.
+replicas: 2
 resources:
   requests:
     cpu: 200m

@@ -5,7 +5,7 @@ metadata:
   labels:
     app: litellm
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
       app: litellm
@@ -20,6 +20,16 @@ spec:
         # read only at start.
         secret-store/enabled: {{ dig "secretStore" "enabled" false .Values.global | quote }}
     spec:
+      # Prefer one replica per node. "Preferred": it never blocks scheduling.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: litellm
       containers:
         - name: litellm
           image: {{ .Values.image }}
@@ -107,6 +117,20 @@ spec:
     - name: http
       port: 80
       targetPort: http
+---
+# Node drains (for example a cluster upgrade) evict one replica at a time, so the other one
+# keeps serving. maxUnavailable (not minAvailable) does not block drains with 1 replica.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: litellm
+  labels:
+    app: litellm
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: litellm
 ---
 # LiteLLM is reachable only through the gateway (openshift-ingress): no bypass.
 apiVersion: networking.k8s.io/v1

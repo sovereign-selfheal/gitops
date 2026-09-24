@@ -3,6 +3,9 @@ global: {}
 # Custom image: presidio-analyzer 2.2.364 + Italian spaCy model (built from the
 # old repo, images/presidio-multilang/Containerfile).
 image: quay.io/asalvati/presidio-analyzer-multilang:0.2
+# Two replicas, preferably on different nodes: LiteLLM keeps its privacy gate if one pod
+# or node fails.
+replicas: 2
 resources:
   requests:
     cpu: 200m

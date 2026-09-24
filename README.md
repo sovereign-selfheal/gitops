@@ -22,9 +22,16 @@ client ──> Route maas-router (ansible) ──> Gateway openshift-ai-inferenc
 |---|---|---|---|
 | `secrets` | `maas-routing` | 0 | ESO `Password` generator, ExternalSecrets for the API keys, SOTA key, classifier |
 | `local-model` | `local-models` | 1 | ServingRuntime (copy of the RHOAI template), InferenceService, NetworkPolicies |
-| `presidio` | `maas-routing` | 1 | Deployment, Service, NetworkPolicy (no egress) |
-| `litellm-router` | `maas-routing` | 2 | ConfigMap (config + hook code + policies), Deployment, Service, NetworkPolicy |
+| `presidio` | `maas-routing` | 1 | Deployment (2 replicas), PodDisruptionBudget, Service, NetworkPolicy (no egress) |
+| `litellm-router` | `maas-routing` | 2 | ConfigMap (config + hook code + policies), Deployment (2 replicas), PodDisruptionBudget, Service, NetworkPolicy |
 | `frontdoor` | `maas-routing` | 3 | HTTPRoute, AuthPolicy, TokenRateLimitPolicy |
+
+Presidio and LiteLLM run 2 replicas each (value `replicas` of the component), so one pod or node can
+fail without stopping the router. A preferred pod anti-affinity puts the replicas on different nodes
+when it can; it never blocks scheduling. The SOTA token cap of the router (`sota_token_budget` in
+`components/litellm-router/files/chain.yaml`) is counted in memory per pod, so with 2 replicas the real
+cap is up to twice the value. The token budgets per tier (TokenRateLimitPolicy) are shared and are the
+real limit.
 
 ## Values
 

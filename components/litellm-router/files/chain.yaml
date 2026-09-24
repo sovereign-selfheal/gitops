@@ -71,6 +71,9 @@ efficiency:
                                     # real budget. 100000 was reached after 30-60 SOTA answers
                                     # in a demo day, then every request silently went LOCAL.
                                     # Set to 0 to disable the cap; lower it to show fallback.
+                                    # Counted per pod: with 2 LiteLLM replicas the real cap is
+                                    # up to 2x this value, and the pod that gets the request
+                                    # decides the fallback.
 
 # --- Gate 2 — privacy --------------------------------------------------------
 # Reuses the hardened privacy-plus engine (A regex+validators, B lexicons,
