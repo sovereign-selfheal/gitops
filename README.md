@@ -109,11 +109,14 @@ oc get secret apikey-research-1 -n maas-routing -o jsonpath='{.data.api_key}' | 
 ## Check your changes
 
 ```bash
-yamllint .
+uvx yamllint .
 for chart in bootstrap components/*/; do helm lint "$chart"; done
-for p in gpu cpu; do scripts/render.sh "$p" "rendered/$p"; done
+for p in gpu cpu; do uv run --no-project --with pyyaml scripts/render.sh "$p" "rendered/$p"; done
 kubeconform -summary -ignore-missing-schemas rendered/gpu/*.yaml
 ```
+
+The Python tools (yamllint, and PyYAML for `scripts/render.sh`) run with [uv](https://docs.astral.sh/uv/),
+never pip; the CI pins their versions.
 
 `scripts/render.sh` renders the charts the way Argo CD does, then checks that no component renders a
 Namespace or a Secret, or uses a namespace outside the contract. Use Helm 3 (`HELM=/path/to/helm3`):

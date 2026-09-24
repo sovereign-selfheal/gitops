@@ -60,14 +60,15 @@ scripts/ci-values.yaml
   it moves into the image of the future `router` repo. The policies (`chain.yaml`, `privacy-plus.yaml`)
   are maintained here: this repo is their source of truth. `chain.yaml` has Italian keywords added.
 - Comments, docs and commit messages in **English**, level B2/C1: short, clear sentences, no idioms.
+- **Python tools with uv** (`uvx`, `uv run --with`), never pip. The CI pins their versions.
 
 ## 5. Before you open a PR
 
 ```bash
-yamllint .
+uvx yamllint .
 for chart in bootstrap components/*/; do helm lint "$chart"; done
 shellcheck scripts/*.sh
-for p in gpu cpu; do scripts/render.sh "$p" "rendered/$p" && kubeconform -summary -ignore-missing-schemas rendered/$p/*.yaml; done
+for p in gpu cpu; do uv run --no-project --with pyyaml scripts/render.sh "$p" "rendered/$p" && kubeconform -summary -ignore-missing-schemas rendered/$p/*.yaml; done
 ```
 
 kubeconform does not know the CRDs (KServe, Kuadrant, ESO, Argo CD). To validate those objects, use a
