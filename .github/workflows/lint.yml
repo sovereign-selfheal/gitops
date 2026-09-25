@@ -43,6 +43,9 @@ jobs:
       - name: shellcheck
         run: shellcheck scripts/*.sh
 
+      - name: Hook code equals the router repo at routerVersion
+        run: scripts/sync-router-code.sh check
+
       - name: Render and validate (gpu and cpu profiles)
         run: |
           for profile in gpu cpu; do

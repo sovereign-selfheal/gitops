@@ -125,12 +125,13 @@ lexicons:
 # SUPPORT STATUS: Presidio is community open-source, NOT Red Hat-supported
 # (CLAUDE.md §3). It runs in-cluster on CPU with no external egress.
 #
-# Option 2 (multilingual): the custom image quay.io/asalvati/presidio-analyzer-
-# multilang bundles the English (en_core_web_lg) AND Italian (it_core_news_md) spaCy
-# models. privacy_scoring.py detects the payload language with fastText and calls
-# Presidio with the matching model; a language Presidio does NOT model is handled
-# per `on_unsupported` (skip -> rely on A+B, which are bilingual/deterministic).
-# This removes the English-model-on-Italian false positive (e.g. "ciao" -> PERSON).
+# Option 2 (multilingual): the custom image quay.io/sovereign-selfheal/presidio
+# (repo github.com/sovereign-selfheal/presidio) bundles the English (en_core_web_lg)
+# AND Italian (it_core_news_md) spaCy models. privacy_scoring.py detects the payload
+# language with fastText and calls Presidio with the matching model; a language
+# Presidio does NOT model is handled per `on_unsupported` (skip -> rely on A+B, which
+# are bilingual/deterministic). This removes the English-model-on-Italian false
+# positive (e.g. "ciao" -> PERSON).
 ner:
   enabled: true
   url: http://presidio-analyzer.maas-routing.svc.cluster.local:3000/analyze

@@ -15,9 +15,13 @@ global:
     mode: local
     grayLow: "0"
 
-# Custom image: LiteLLM v1.102.0 + fastText language ID model (built from the
-# old repo, images/litellm-fasttext/Containerfile).
-image: quay.io/asalvati/litellm-privacy-plus:0.2
+# Version (git tag) of the router repo (github.com/sovereign-selfheal/router). The hook
+# code in files/*.py is a copy of that repo at this tag, and the image below must come
+# from the same tag. scripts/sync-router-code.sh sets it and checks the copy (CI).
+routerVersion: v0.3.0
+# Image of the router repo: LiteLLM v1.102.0 + fastText language ID model.
+# tag v0.3.0, resolved on quay.io on 2026-09-25
+image: quay.io/sovereign-selfheal/router@sha256:567be05d82ff91e88447870d5f6cca37d9bad12eadf91c806932c53be396c6e0
 # Two replicas, preferably on different nodes. The SOTA token counter of the policy hook
 # (sota_token_budget in files/chain.yaml) is per pod.
 replicas: 2

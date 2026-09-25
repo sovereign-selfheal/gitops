@@ -1,5 +1,6 @@
-# Config, hook code and policies, mounted at /app/litellm. The hook code in files/ is
-# a verbatim copy from the old repo; the policies are maintained here (see AGENTS.md).
+# Config, hook code and policies, mounted at /app/litellm. The hook code in files/*.py is
+# a copy of the router repo at `routerVersion` (scripts/sync-router-code.sh; never edit
+# it here). The policies are maintained here (see AGENTS.md).
 apiVersion: v1
 kind: ConfigMap
 metadata:

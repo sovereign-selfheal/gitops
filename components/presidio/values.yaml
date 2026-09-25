@@ -1,8 +1,9 @@
 global: {}
 
-# Custom image: presidio-analyzer 2.2.364 + Italian spaCy model (built from the
-# old repo, images/presidio-multilang/Containerfile).
-image: quay.io/asalvati/presidio-analyzer-multilang:0.2
+# Image of the presidio repo (github.com/sovereign-selfheal/presidio): presidio-analyzer
+# 2.2.364 + English and Italian spaCy models.
+# tag v0.3.0, resolved on quay.io on 2026-09-25
+image: quay.io/sovereign-selfheal/presidio@sha256:584712c35c8b6628f460eab7013ce20c54d9285dd91a212e1a25edb2f819f73a
 # Two replicas, preferably on different nodes: LiteLLM keeps its privacy gate if one pod
 # or node fails.
 replicas: 2

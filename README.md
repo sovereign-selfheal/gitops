@@ -88,6 +88,26 @@ the alias `sota-smart` points to the local model, so the gates and policies work
 request is served by the local model. The router logs still show `routed_to: sota-smart` when a gate
 chooses "SOTA".
 
+## Router code and images
+
+Two custom images and the router code come from other repos of the project:
+
+| Item | Source | Pinned in |
+|---|---|---|
+| Hook code `components/litellm-router/files/*.py` | [`router`](https://github.com/sovereign-selfheal/router), at the tag `routerVersion` | `components/litellm-router/values.yaml` (`routerVersion`) |
+| LiteLLM image (LiteLLM + fastText) | `quay.io/sovereign-selfheal/router`, same tag | `components/litellm-router/values.yaml` (`image`, by digest) |
+| Presidio image (English and Italian NER) | [`presidio`](https://github.com/sovereign-selfheal/presidio), `quay.io/sovereign-selfheal/presidio` | `components/presidio/values.yaml` (`image`, by digest) |
+
+Never edit the `*.py` files here. To move to a new router release:
+
+```bash
+scripts/sync-router-code.sh sync vX.Y.Z   # copies the hook code at the tag, sets routerVersion
+# then pin the digest of quay.io/sovereign-selfheal/router:vX.Y.Z in components/litellm-router/values.yaml
+scripts/sync-router-code.sh check         # also run by CI
+```
+
+The policies (`chain.yaml`, `privacy-plus.yaml`) stay in this repo.
+
 ## Secrets
 
 No Secret is stored in git. The External Secrets Operator creates them:
