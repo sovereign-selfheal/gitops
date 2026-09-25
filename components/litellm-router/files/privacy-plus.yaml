@@ -161,6 +161,15 @@ ner:
     # --threads override). The engine only requests the entities listed here.
     PHONE_NUMBER: 0.35
     IP_ADDRESS: 0.40
+  # A PERSON counts only with at least this many words. Presidio reads single words as
+  # names ("Kafka", "Paxos", "Cassandra", the Italian verb "Spiega"); a full name like
+  # "Mario Rossi" has two. Default 1 (every PERSON counts). Needs router >= v0.4.0.
+  person_min_words: 2
+  # These types count only when the text also has an identifier: structured PII
+  # (card, IBAN, email, phone...) or another NER entity that counts. A nationality or a
+  # place alone names nobody ("European banks in Italy"). Default [] (always count).
+  # Needs router >= v0.4.0.
+  context_entities: [NRP, LOCATION]
 
 # --- C2 — semantic classifier (LLM). OPTIONAL, gray-zone only, ADVISORY -------
 # Additive & swappable. An OpenAI-compatible model judges sensitivity ONLY for

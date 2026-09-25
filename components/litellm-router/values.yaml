@@ -18,9 +18,9 @@ global:
 # Version (git tag) of the router repo (github.com/sovereign-selfheal/router). The hook
 # code in files/*.py is a copy of that repo at this tag, and the image below must come
 # from the same tag. scripts/sync-router-code.sh sets it and checks the copy (CI).
-routerVersion: v0.3.0
+routerVersion: v0.4.0
 # Image of the router repo: LiteLLM v1.102.0 + fastText language ID model.
-# tag v0.3.0, resolved on quay.io on 2026-09-25
+# tag v0.4.0, resolved on quay.io on 2026-09-25 (same image as v0.3.0: only the hook code changed)
 image: quay.io/sovereign-selfheal/router@sha256:567be05d82ff91e88447870d5f6cca37d9bad12eadf91c806932c53be396c6e0
 # Two replicas, preferably on different nodes. The SOTA token counter of the policy hook
 # (sota_token_budget in files/chain.yaml) is per pod.
