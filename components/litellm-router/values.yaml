@@ -2,6 +2,7 @@
 global:
   namespaces:
     models: local-models
+    observability: observability
   localModel:
     name: example-local
   sota:
@@ -26,6 +27,11 @@ routerVersion: v0.5.0
 # tag v0.5.0, resolved on quay.io on 2026-09-26 (same image as v0.3.0 and v0.4.0: the Containerfile
 # did not change; it already has opentelemetry and prometheus_client)
 image: quay.io/sovereign-selfheal/router@sha256:567be05d82ff91e88447870d5f6cca37d9bad12eadf91c806932c53be396c6e0
+# Perses dashboard `routing-decisions` (Observe -> Dashboards), only with observability.enabled.
+dashboard:
+  # Tempo tenant of the router traces: keep it equal to tempo.tenant.name in
+  # components/observability and to observability_tempo_tenant in the ansible repo.
+  tempoTenant: router
 # Port of the metrics server of the hook (env ROUTER_METRICS_PORT, router v0.5.0+): router
 # metrics and LiteLLM metrics. Not exposed by the gateway.
 metricsPort: 9091
