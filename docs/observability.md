@@ -18,6 +18,22 @@ the cluster: the collector, Tempo and Prometheus run in the cluster, and nothing
 | `otel` and `prometheus` callbacks, `OTEL_*` env, metrics port 9091, ServiceMonitor | component `litellm-router` | namespace `maas-routing` |
 | vLLM metrics (ServiceMonitor `<model>-metrics`) | created by RHOAI | namespace `local-models` |
 
+## The dashboard
+
+*Observe → Dashboards*, project `maas-routing`, dashboard **Sovereign router - routing decisions**
+(Perses, started by the Cluster Observability Operator; component `litellm-router`). It refreshes every
+15 seconds and shows:
+
+- **Routing decisions**: requests kept LOCAL, sent to SOTA, stopped by the privacy gate, SOTA fallbacks,
+  the share kept in the cluster (gauge), which gate decided (pie chart), decisions per minute.
+- **Latest traces**: two trace tables side by side, kept LOCAL and sent to SOTA (click a trace to see the
+  gates), and links to *Observe → Traces* with the same filters.
+- **Models**: tokens per minute, answer time p90 and privacy score, by model.
+
+The counters count since the start of the LiteLLM pods (2 replicas, summed). The dashboard reads Thanos
+and Tempo through Perses with the token of the console user. The application menu of the console (grid
+icon) also has the section *Sovereign Self-Healing demo* with the same trace links (ansible repo).
+
 ## The trace of one request
 
 ```

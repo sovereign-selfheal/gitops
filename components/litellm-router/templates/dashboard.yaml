@@ -1,0 +1,357 @@
+{{- if .Values.global.observability.enabled }}
+{{- $ns := .Release.Namespace }}
+{{- $tenant := .Values.dashboard.tempoTenant }}
+{{- $traces := printf "/observe/traces?namespace=%s&name=tempo&tenant=%s&limit=20&q=" .Values.global.namespaces.observability $tenant }}
+# Perses dashboard in the console (Observe -> Dashboards, project {{ $ns }}): the routing
+# decisions of the router, live. Perses is started by the Cluster Observability Operator
+# (UIPlugin monitoring, ansible repo). Queries run with the token of the console user.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDatasource
+metadata:
+  name: router-prometheus
+spec:
+  # The operator turns `client` into a Perses secret named <datasource>-secret.
+  client:
+    tls:
+      enable: true
+      caCert:
+        type: file
+        certPath: /ca/service-ca.crt
+  config:
+    default: true
+    display:
+      name: Cluster metrics (Thanos)
+    plugin:
+      kind: PrometheusDatasource
+      spec:
+        proxy:
+          kind: HTTPProxy
+          spec:
+            secret: router-prometheus-secret
+            url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
+---
+apiVersion: perses.dev/v1alpha2
+kind: PersesDatasource
+metadata:
+  name: router-tempo
+spec:
+  client:
+    tls:
+      enable: true
+      caCert:
+        type: file
+        certPath: /ca/service-ca.crt
+  config:
+    default: true
+    display:
+      name: Router traces (Tempo)
+    plugin:
+      kind: TempoDatasource
+      spec:
+        proxy:
+          kind: HTTPProxy
+          spec:
+            secret: router-tempo-secret
+            url: {{ printf "https://tempo-tempo-gateway.%s.svc.cluster.local:8080/api/traces/v1/%s/tempo" .Values.global.namespaces.observability $tenant }}
+---
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: routing-decisions
+spec:
+  config:
+    display:
+      name: Sovereign router - routing decisions
+      description: Where each request went (local model or SOTA model) and which gate decided. Counters are since the start of the LiteLLM pods.
+    duration: 30m
+    refreshInterval: 15s
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: Routing decisions
+          items:
+            - {x: 0, "y": 0, width: 5, height: 5, content: {$ref: "#/spec/panels/local"}}
+            - {x: 5, "y": 0, width: 5, height: 5, content: {$ref: "#/spec/panels/sota"}}
+            - {x: 10, "y": 0, width: 5, height: 5, content: {$ref: "#/spec/panels/privacy"}}
+            - {x: 15, "y": 0, width: 4, height: 5, content: {$ref: "#/spec/panels/fallbacks"}}
+            - {x: 19, "y": 0, width: 5, height: 5, content: {$ref: "#/spec/panels/share"}}
+            - {x: 0, "y": 5, width: 8, height: 9, content: {$ref: "#/spec/panels/decidedBy"}}
+            - {x: 8, "y": 5, width: 16, height: 9, content: {$ref: "#/spec/panels/decisionsPerMinute"}}
+      - kind: Grid
+        spec:
+          display:
+            title: Latest traces (click a trace to see the gates)
+          items:
+            - {x: 0, "y": 0, width: 9, height: 10, content: {$ref: "#/spec/panels/tracesLocal"}}
+            - {x: 9, "y": 0, width: 9, height: 10, content: {$ref: "#/spec/panels/tracesSota"}}
+            - {x: 18, "y": 0, width: 6, height: 10, content: {$ref: "#/spec/panels/links"}}
+      - kind: Grid
+        spec:
+          display:
+            title: Models
+          items:
+            - {x: 0, "y": 0, width: 8, height: 8, content: {$ref: "#/spec/panels/tokens"}}
+            - {x: 8, "y": 0, width: 8, height: 8, content: {$ref: "#/spec/panels/latency"}}
+            - {x: 16, "y": 0, width: 8, height: 8, content: {$ref: "#/spec/panels/privacyScore"}}
+    panels:
+      local:
+        kind: Panel
+        spec:
+          display:
+            name: Kept LOCAL
+            description: Requests served by the local model
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              colorMode: background_solid
+              thresholds: {defaultColor: "#3e8635", steps: []}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(router_requests_total{namespace=%q,routed_to=\"local-fast\"}) or vector(0)" $ns | quote }}
+      sota:
+        kind: Panel
+        spec:
+          display:
+            name: Sent to SOTA
+            description: Requests routed to the external SOTA model (in local-only mode it is the local model too)
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              colorMode: background_solid
+              thresholds: {defaultColor: "#0066cc", steps: []}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(router_requests_total{namespace=%q,routed_to=\"sota-smart\"}) or vector(0)" $ns | quote }}
+      privacy:
+        kind: Panel
+        spec:
+          display:
+            name: Stopped by the privacy gate
+            description: Complex requests that would go to SOTA, kept local because they contain personal data
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              colorMode: background_solid
+              thresholds: {defaultColor: "#f0ab00", steps: []}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(router_requests_total{namespace=%q,decided_by=\"privacy\"}) or vector(0)" $ns | quote }}
+      fallbacks:
+        kind: Panel
+        spec:
+          display:
+            name: SOTA fallbacks
+            description: SOTA calls that failed; LiteLLM answered with the local model
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              thresholds: {defaultColor: "#3e8635", steps: [{value: 1, color: "#c9190b"}]}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(litellm_deployment_successful_fallbacks_total{namespace=%q,requested_model=\"sota-smart\"}) or vector(0)" $ns | quote }}
+      share:
+        kind: Panel
+        spec:
+          display:
+            name: Share kept in the cluster
+          plugin:
+            kind: GaugeChart
+            spec:
+              calculation: last-number
+              format: {unit: percent, decimalPlaces: 0}
+              max: 100
+              thresholds: {defaultColor: "#0066cc", steps: [{value: 50, color: "#3e8635"}]}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "100 * sum(router_requests_total{namespace=%q,routed_to=\"local-fast\"}) / sum(router_requests_total{namespace=%q})" $ns $ns | quote }}
+      decidedBy:
+        kind: Panel
+        spec:
+          display:
+            name: Which gate decided
+            description: "efficiency: short or simple; privacy: personal data; tiering: team limited to local; all-sota: every gate said SOTA"
+          plugin:
+            kind: PieChart
+            spec:
+              calculation: last-number
+              mode: percentage
+              radius: 60
+              showLabels: true
+              legend: {position: right}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (decided_by) (router_requests_total{namespace=%q})" $ns | quote }}
+                    seriesNameFormat: {{ "{{decided_by}}" | quote }}
+      decisionsPerMinute:
+        kind: Panel
+        spec:
+          display:
+            name: Decisions per minute
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom}
+              visual: {display: bar, stack: all, palette: {mode: categorical}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (routed_to, decided_by) (rate(router_requests_total{namespace=%q}[$__rate_interval])) * 60" $ns | quote }}
+                    seriesNameFormat: {{ "{{routed_to}} ({{decided_by}})" | quote }}
+      tracesLocal:
+        kind: Panel
+        spec:
+          display:
+            name: Kept LOCAL
+          plugin:
+            kind: TraceTable
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource: {kind: TempoDatasource, name: router-tempo}
+                    query: '{ span.route.target = "local-fast" }'
+                    limit: 20
+      tracesSota:
+        kind: Panel
+        spec:
+          display:
+            name: Sent to SOTA
+          plugin:
+            kind: TraceTable
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource: {kind: TempoDatasource, name: router-tempo}
+                    query: '{ span.route.target = "sota-smart" }'
+                    limit: 20
+      links:
+        kind: Panel
+        spec:
+          display:
+            name: Open in Observe -> Traces
+          plugin:
+            kind: Markdown
+            spec:
+              text: |
+                In a trace, open the span **gate.privacy**: `privacy.score`, `privacy.threshold` and
+                `privacy.signals` say *why*. The span **litellm_request** says *where* (`api_base`).
+
+                - [Every routing decision]({{ $traces }}{{ `{ name = "router.chain" }` | urlquery }})
+                - [Kept LOCAL]({{ $traces }}{{ `{ span.route.target = "local-fast" }` | urlquery }})
+                - [Sent to SOTA]({{ $traces }}{{ `{ span.route.target = "sota-smart" }` | urlquery }})
+                - [Stopped by the privacy gate]({{ $traces }}{{ `{ name = "gate.privacy" && span.gate.verdict = "local" }` | urlquery }})
+      tokens:
+        kind: Panel
+        spec:
+          display:
+            name: Tokens per minute, by model
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (requested_model) (rate(litellm_total_tokens_metric_total{namespace=%q}[$__rate_interval])) * 60" $ns | quote }}
+                    seriesNameFormat: {{ "{{requested_model}}" | quote }}
+      latency:
+        kind: Panel
+        spec:
+          display:
+            name: Answer time p90, by model
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom}
+              yAxis: {format: {unit: seconds}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "histogram_quantile(0.9, sum by (le, requested_model) (rate(litellm_request_total_latency_metric_bucket{namespace=%q}[$__rate_interval])))" $ns | quote }}
+                    seriesNameFormat: {{ "{{requested_model}}" | quote }}
+      privacyScore:
+        kind: Panel
+        spec:
+          display:
+            name: Privacy score (median and p90)
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom}
+              yAxis: {min: 0, max: 1}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "histogram_quantile(0.5, sum by (le) (rate(router_privacy_score_bucket{namespace=%q}[$__rate_interval])))" $ns | quote }}
+                    seriesNameFormat: median
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "histogram_quantile(0.9, sum by (le) (rate(router_privacy_score_bucket{namespace=%q}[$__rate_interval])))" $ns | quote }}
+                    seriesNameFormat: p90
+{{- end }}
