@@ -10,11 +10,16 @@ Platform*. The cluster preparation and the root Application are in the `ansible`
 client ──> Route maas-router (ansible) ──> Gateway openshift-ai-inference (ansible)
            │  AuthPolicy: API key per tier, sets x-team      ┐ component frontdoor
            │  TokenRateLimitPolicy: token budget per tier     ┘
+           │  AuthPolicy also refuses /metrics (403)                ┘
            └──> LiteLLM (component litellm-router): efficiency gate, then privacy gate
                   ├── Presidio analyzer (component presidio): PII detection, EN + IT
                   ├── local model (component local-model): Granite 3.3 8B on GPU, or Qwen2.5 0.5B on CPU
-                  └── external SOTA model (OpenAI compatible), fallback to the local model
+                  ├── external SOTA model (OpenAI compatible), fallback to the local model
+                  ├ ─ traces (OTLP) ─> collector otel ─> Tempo (component observability)
+                  └ ─ metrics :9091 <─ user workload Prometheus (ServiceMonitor litellm)
 ```
+
+Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/observability.md).
 
 ## Components
 
@@ -24,8 +29,8 @@ client ──> Route maas-router (ansible) ──> Gateway openshift-ai-inferenc
 | `secrets` | `maas-routing` | 0 | ESO `Password` generator, ExternalSecrets for the API keys, SOTA key, classifier |
 | `local-model` | `local-models` | 1 | ServingRuntime (copy of the RHOAI template), InferenceService, NetworkPolicies |
 | `presidio` | `maas-routing` | 1 | Deployment (2 replicas), PodDisruptionBudget, Service, NetworkPolicy (no egress) |
-| `litellm-router` | `maas-routing` | 2 | ConfigMap (config + hook code + policies), Deployment (2 replicas), PodDisruptionBudget, Service, NetworkPolicy |
-| `frontdoor` | `maas-routing` | 3 | HTTPRoute, AuthPolicy, TokenRateLimitPolicy |
+| `litellm-router` | `maas-routing` | 2 | ConfigMap (config + hook code + policies), Deployment (2 replicas), PodDisruptionBudget, Service (API port 80, metrics 9091), ServiceMonitor, NetworkPolicy (4000 from the gateway, 9091 from monitoring) |
+| `frontdoor` | `maas-routing` | 3 | HTTPRoute, AuthPolicy (API key; refuses `/metrics`), TokenRateLimitPolicy |
 
 Presidio and LiteLLM run 2 replicas each (value `replicas` of the component), so one pod or node can
 fail without stopping the router. A preferred pod anti-affinity puts the replicas on different nodes
@@ -63,8 +68,15 @@ The routing decisions are visible as traces in the console (*Observe → Traces*
   collector writes the tenant `router` with its service account token. The ansible repo installs the
   operators, grants that write permission and adds the console plugin. Reading the traces needs the
   read permission on the tenant (cluster-admin has it).
-- **Metrics**: user workload monitoring is turned on by the ansible repo. RHOAI creates the
-  ServiceMonitor of the local model (`<model>-metrics`, vLLM metrics on port 8080) by itself.
+- **Metrics**: user workload monitoring is turned on by the ansible repo. The ServiceMonitor `litellm`
+  scrapes port 9091 of LiteLLM: router metrics (`router_requests_total`, `router_privacy_score`,
+  `router_sota_budget_used_tokens`) and LiteLLM metrics (tokens, latency, fallbacks per model). The
+  public route refuses `/metrics` (AuthPolicy, 403). RHOAI creates the ServiceMonitor of the local model
+  (`<model>-metrics`, vLLM metrics on port 8080) by itself.
+- **Router traces**: LiteLLM sends one trace per request to the collector (`otel` callback, only with
+  `observability.enabled`): the proxy span, `router.chain` with one span per gate, and the model call.
+  Prompt and answer text are in the model call span (LiteLLM default); only users with the read
+  permission on the Tempo tenant can see them. Span tree, metrics and a test: [`docs/observability.md`](docs/observability.md).
 - `observability.enabled: false` (seed value, from `observability_enabled` in the ansible repo)
   removes the component. The rest of the platform works as before.
 

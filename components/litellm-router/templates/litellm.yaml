@@ -39,11 +39,30 @@ spec:
           ports:
             - name: http
               containerPort: 4000
+            # Router metrics and LiteLLM metrics (router v0.5.0+), scraped by user workload
+            # monitoring through the ServiceMonitor below.
+            - name: metrics
+              containerPort: {{ .Values.metricsPort }}
           env:
             - name: POLICY_DIR
               value: /app/litellm
             - name: PYTHONPATH
               value: /app/litellm
+            - name: ROUTER_METRICS_PORT
+              value: {{ .Values.metricsPort | quote }}
+            {{- if .Values.global.observability.enabled }}
+            # Traces: read by the `otel` callback of LiteLLM (not by the hook).
+            - name: OTEL_EXPORTER
+              value: otlp_http
+            - name: OTEL_ENDPOINT
+              value: {{ required "global.observability.otlpEndpoint is required" .Values.global.observability.otlpEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: litellm-router
+            # One child span for the LLM call (litellm_request, with the api_base of the model)
+            # under the proxy request span. Without it LiteLLM only adds attributes to the parent.
+            - name: USE_OTEL_LITELLM_REQUEST_SPAN
+              value: "true"
+            {{- end }}
             {{- if eq .Values.global.classifier.mode "local" }}
             # C2 classifier = the local model: the prompt never leaves the cluster.
             - name: CLASSIFIER_ENABLED
@@ -117,6 +136,25 @@ spec:
     - name: http
       port: 80
       targetPort: http
+    - name: metrics
+      port: {{ .Values.metricsPort }}
+      targetPort: metrics
+---
+# User workload monitoring scrapes the router and LiteLLM metrics.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: litellm
+  labels:
+    app: litellm
+spec:
+  selector:
+    matchLabels:
+      app: litellm
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
 ---
 # Node drains (for example a cluster upgrade) evict one replica at a time, so the other one
 # keeps serving. maxUnavailable (not minAvailable) does not block drains with 1 replica.
@@ -132,7 +170,8 @@ spec:
     matchLabels:
       app: litellm
 ---
-# LiteLLM is reachable only through the gateway (openshift-ingress): no bypass.
+# LiteLLM is reachable only through the gateway (openshift-ingress): no bypass. The metrics
+# port is open only to the monitoring namespaces (user workload Prometheus).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -151,3 +190,10 @@ spec:
       ports:
         - protocol: TCP
           port: 4000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: monitoring
+      ports:
+        - protocol: TCP
+          port: {{ .Values.metricsPort }}
