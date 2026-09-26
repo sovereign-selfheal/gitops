@@ -15,7 +15,7 @@ here. After that, Argo CD owns every object described in this repo.
 
 | Owner | Objects |
 |---|---|
-| `ansible` | Operators, DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, GPU nodes, the namespaces `local-models` and `maas-routing`, the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), Argo CD settings, the root Application |
+| `ansible` | Operators, DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, GPU nodes, the namespaces `local-models` and `maas-routing`, the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), the model image pre-pull DaemonSets (namespace `sovereign-selfheal-prepull`), Argo CD settings, the root Application |
 | `gitops` (this repo) | Every object inside `local-models` and `maas-routing` |
 
 - **Namespaces** are created by Ansible with the label `argocd.argoproj.io/managed-by: openshift-gitops`.
@@ -24,6 +24,11 @@ here. After that, Argo CD owns every object described in this repo.
 - **Values set by the seed** (root Application, `helm.valuesObject`): `appsDomain`, `modelProfile`
   (`gpu` or `cpu`), `sota.enabled`, `sota.apiBase`, `sota.model`, `sota.servedMatch`, `sota.reasoning`, `secretStore.enabled`,
   `classifier.mode` (`local`, `external` or `off`), and optionally `tiers`. Defaults are in `bootstrap/values.yaml`.
+- **Local model images**: the ansible repo pre-pulls the images of the local model on the model nodes
+  (`roles/model_prepull`), so a new or restarted model pod does not wait for the download. When you change
+  `localModel.profiles.<profile>.storageUri` or `.runtimeImage` in `bootstrap/values.yaml`, update
+  `model_prepull_images` in the ansible repo (`roles/model_prepull/defaults/main.yml`) with the same digests.
+  Otherwise the pre-pull downloads images nobody uses; the ansible seed prints a warning after the sync.
 - **Local-only mode**: without SOTA settings in the ansible-vault, `sota.enabled` is `false` and the alias
   `sota-smart` points to the local model. Every template must keep working in this mode.
 - **Hostnames**: the HTTPRoute here and the Route in Ansible both use `router.<appsDomain>`.
