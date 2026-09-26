@@ -1,6 +1,7 @@
 {{- $global := include "bootstrap.global" . | fromYaml }}
 {{- range $name, $c := .Values.components }}
-{{- if $c.enabled }}
+{{- /* The observability component needs the operators installed by observability_enabled. */ -}}
+{{- if and $c.enabled (or (ne $name "observability") $.Values.observability.enabled) }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application

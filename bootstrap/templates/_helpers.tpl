@@ -14,6 +14,8 @@ secretStore:
   {{- toYaml .Values.secretStore | nindent 2 }}
 classifier:
   {{- toYaml .Values.classifier | nindent 2 }}
+observability:
+  {{- toYaml .Values.observability | nindent 2 }}
 tiers:
   {{- toYaml .Values.tiers | nindent 2 }}
 localModel:

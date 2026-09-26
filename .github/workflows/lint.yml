@@ -52,3 +52,9 @@ jobs:
             uv run --no-project --with "pyyaml==${PYYAML_VERSION}" scripts/render.sh "${profile}" "rendered/${profile}"
             kubeconform -summary -ignore-missing-schemas "rendered/${profile}"/*.yaml
           done
+
+      - name: Render and validate (local-only mode, no traces)
+        run: |
+          uv run --no-project --with "pyyaml==${PYYAML_VERSION}" scripts/render.sh gpu rendered/minimal \
+            --set observability.enabled=false --set sota.enabled=false --set classifier.mode=local
+          kubeconform -summary -ignore-missing-schemas rendered/minimal/*.yaml

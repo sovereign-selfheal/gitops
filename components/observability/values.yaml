@@ -1,0 +1,37 @@
+global: {}
+
+# The images of Tempo and of the collector come from the Tempo and OpenTelemetry operators,
+# which the ansible repo pins by CSV: a new image version is an operator pin change there.
+
+# Tempo in one pod (TempoMonolithic), traces on a persistent volume: no object storage.
+tempo:
+  # Size of the volume that holds the traces (default StorageClass).
+  storageSize: 10Gi
+  # Traces older than this are deleted. A few days are enough for the demo.
+  retention: 72h
+  # Tenant of the router traces. The ansible repo grants the collector the right to write it
+  # (ClusterRole on tempo.grafana.com/<tenant name>); keep both names equal.
+  tenant:
+    name: router
+    id: 5f1c2d3e-8b7a-4c6d-9e0f-1a2b3c4d5e6f
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+# OpenTelemetry collector: receives OTLP from the router (and vLLM) and sends it to Tempo.
+# The operator names the Service <name>-collector: `otel` gives otel-collector (contract with
+# the ansible repo and the litellm-router component).
+collector:
+  name: otel
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

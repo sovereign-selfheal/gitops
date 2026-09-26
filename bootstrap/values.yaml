@@ -36,6 +36,17 @@ argocd:
 namespaces:
   models: local-models
   router: maas-routing
+  observability: observability
+
+# ----- Observability (traces of the router) --------------------------------------
+# Set by the seed from observability_enabled. true: component observability (Tempo and the
+# OpenTelemetry collector, needs the operators of the ansible repo) and LiteLLM sends its
+# traces there. false: no traces; the router metrics stay on (they need only user workload
+# monitoring).
+observability:
+  enabled: true
+  # OTLP http endpoint of the collector `otel` (the operator names the Service otel-collector).
+  otlpEndpoint: http://otel-collector.observability.svc:4318
 
 # ----- Secrets (External Secrets Operator) ---------------------------------------
 # The ClusterSecretStore is created by Ansible (roles/secrets_bootstrap) when a SOTA key
@@ -138,6 +149,10 @@ localModel:
 # ----- Components (one Argo CD Application each) --------------------------------
 # wave: Argo CD sync wave of the Application; namespaceRef: key in `namespaces` above.
 components:
+  observability:
+    enabled: true      # also needs observability.enabled
+    wave: 0
+    namespaceRef: observability
   secrets:
     enabled: true
     wave: 0

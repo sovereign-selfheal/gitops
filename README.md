@@ -20,6 +20,7 @@ client ──> Route maas-router (ansible) ──> Gateway openshift-ai-inferenc
 
 | Component | Namespace | Sync wave | Objects |
 |---|---|---|---|
+| `observability` | `observability` | 0 | `TempoMonolithic` `tempo` (traces on a 10Gi volume, 72h, multi-tenancy `openshift`, tenant `router`), `OpenTelemetryCollector` `otel` (OTLP in, Tempo gateway out). Only with `observability.enabled` |
 | `secrets` | `maas-routing` | 0 | ESO `Password` generator, ExternalSecrets for the API keys, SOTA key, classifier |
 | `local-model` | `local-models` | 1 | ServingRuntime (copy of the RHOAI template), InferenceService, NetworkPolicies |
 | `presidio` | `maas-routing` | 1 | Deployment (2 replicas), PodDisruptionBudget, Service, NetworkPolicy (no egress) |
@@ -49,6 +50,27 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 | `sota.reasoning` | `false` | `false`: the SOTA model answers without reasoning (see "Long answers and streaming"); `true`: the model decides |
 | `secretStore.enabled` | `false` | `true` when the ClusterSecretStore exists (see below) |
 | `classifier.mode` | `local` | C2 classifier of the privacy gate: `local` (the local model), `external`, `off` (see below) |
+| `observability.enabled` | `true` | `false`: no Tempo, no collector, no traces (see "Observability") |
+
+## Observability
+
+The routing decisions are visible as traces in the console (*Observe → Traces*) and as metrics
+(*Observe → Metrics*). Everything stays in the cluster.
+
+- **Traces**: component `observability`. The OpenTelemetry collector `otel` receives OTLP on
+  `otel-collector.observability.svc:4318` (http) and `:4317` (grpc) and writes to the Tempo instance
+  `tempo`. Tempo runs with multi-tenancy in `openshift` mode, the supported setup on OpenShift: the
+  collector writes the tenant `router` with its service account token. The ansible repo installs the
+  operators, grants that write permission and adds the console plugin. Reading the traces needs the
+  read permission on the tenant (cluster-admin has it).
+- **Metrics**: user workload monitoring is turned on by the ansible repo. RHOAI creates the
+  ServiceMonitor of the local model (`<model>-metrics`, vLLM metrics on port 8080) by itself.
+- `observability.enabled: false` (seed value, from `observability_enabled` in the ansible repo)
+  removes the component. The rest of the platform works as before.
+
+> **Support status:** the collector and Tempo come from the Red Hat build of OpenTelemetry and the
+> Tempo Operator. LiteLLM, which produces the router traces, is community software, not supported by
+> Red Hat.
 
 ## Long answers and streaming
 
