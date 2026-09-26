@@ -41,6 +41,13 @@ spec:
           selector:
             matchLabels:
               app: maas-litellm
+    authorization:
+      # LiteLLM also serves its metrics on /metrics of the API port (callback prometheus).
+      # They are scraped in the cluster (port 9091); the public route never serves them.
+      no-metrics-path:
+        patternMatching:
+          patterns:
+            - predicate: "!request.path.startsWith('/metrics')"
     response:
       success:
         headers:

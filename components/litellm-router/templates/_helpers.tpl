@@ -40,7 +40,16 @@ model_list:
       api_key: "in-cluster-no-auth"
 
 litellm_settings:
-  callbacks: ["policy_hook_chain.proxy_handler_instance"]
+  # policy_hook_chain: the routing policy. prometheus: LiteLLM metrics (latency, errors, tokens,
+  # fallbacks per model), served with the router metrics on port {{ .Values.metricsPort }} by the
+  # hook (never on the public route: see the AuthPolicy of the frontdoor component).
+  # otel: traces to the in-cluster collector (component observability).
+  callbacks:
+    - policy_hook_chain.proxy_handler_instance
+    - prometheus
+    {{- if .Values.global.observability.enabled }}
+    - otel
+    {{- end }}
   drop_params: true
   num_retries: 2
   request_timeout: 120
