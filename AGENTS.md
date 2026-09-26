@@ -15,15 +15,22 @@ here. After that, Argo CD owns every object described in this repo.
 
 | Owner | Objects |
 |---|---|
-| `ansible` | Operators, DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, GPU nodes, the namespaces `local-models` and `maas-routing`, the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), the model image pre-pull DaemonSets (namespace `sovereign-selfheal-prepull`), Argo CD settings, the root Application |
-| `gitops` (this repo) | Every object inside `local-models` and `maas-routing` |
+| `ansible` | Operators, DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, GPU nodes, the namespaces `local-models` and `maas-routing`, the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), the model image pre-pull DaemonSets (namespace `sovereign-selfheal-prepull`), Argo CD settings, the root Application, the observability operators (OpenTelemetry, Tempo, Cluster Observability), the `UIPlugin` `distributed-tracing`, the Tempo tenant write permission (ClusterRole + binding), the namespace `observability`, user workload monitoring |
+| `gitops` (this repo) | Every object inside `local-models`, `maas-routing` and `observability` |
 
 - **Namespaces** are created by Ansible with the label `argocd.argoproj.io/managed-by: openshift-gitops`.
   The default Argo CD instance can manage only namespaces with this label, and it cannot create Namespaces.
   This repo never declares Namespace objects or any other cluster-scoped object.
 - **Values set by the seed** (root Application, `helm.valuesObject`): `appsDomain`, `modelProfile`
   (`gpu` or `cpu`), `sota.enabled`, `sota.apiBase`, `sota.model`, `sota.servedMatch`, `sota.reasoning`, `secretStore.enabled`,
-  `classifier.mode` (`local`, `external` or `off`), and optionally `tiers`. Defaults are in `bootstrap/values.yaml`.
+  `classifier.mode` (`local`, `external` or `off`), `observability.enabled`, `namespaces.observability`,
+  and optionally `tiers`. Defaults are in `bootstrap/values.yaml`.
+- **Observability**: this repo deploys the Tempo instance `tempo` (kind `TempoMonolithic`, multi-tenancy
+  `openshift`, tenant `router`) and the OpenTelemetry collector `otel` (kind `OpenTelemetryCollector`; the
+  operator names its Service and ServiceAccount `otel-collector`) in the namespace `observability`. OTLP
+  http on `otel-collector.observability.svc:4318`, grpc on `:4317`. The ansible repo lets the ServiceAccount
+  `otel-collector` write the tenant `router`: keep the tenant name equal in both repos. With
+  `observability.enabled: false` the component is not deployed.
 - **Local model images**: the ansible repo pre-pulls the images of the local model on the model nodes
   (`roles/model_prepull`), so a new or restarted model pod does not wait for the download. When you change
   `localModel.profiles.<profile>.storageUri` or `.runtimeImage` in `bootstrap/values.yaml`, update
@@ -35,7 +42,8 @@ here. After that, Argo CD owns every object described in this repo.
 - **Secrets**: never in git. The External Secrets Operator creates them, either from the external store
   or from an in-cluster generator (see README "Secrets").
 - **Argo CD health checks**: Ansible configures the ArgoCD CR so that Argo CD reports the health of
-  `Application` (needed for sync waves between components), `InferenceService` and the Kuadrant policies.
+  `Application` (needed for sync waves between components), `InferenceService`, the Kuadrant policies and
+  `TempoMonolithic`. Argo CD 3.4 knows `OpenTelemetryCollector` by itself.
 
 ## 3. Contract with the `router` and `presidio` repos
 

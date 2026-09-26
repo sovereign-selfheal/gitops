@@ -2,8 +2,9 @@
 # Render the whole repo the way Argo CD does: the bootstrap chart first, then
 # every component with the values that its Application passes.
 #
-# Usage: scripts/render.sh [gpu|cpu] [output dir]
+# Usage: scripts/render.sh [gpu|cpu] [output dir] [helm options for the bootstrap chart]
 #   HELM=/path/to/helm3 scripts/render.sh cpu
+#   scripts/render.sh gpu rendered/off --set observability.enabled=false --set sota.enabled=false
 # Writes <out>/bootstrap.yaml, <out>/<component>.yaml and the values passed to each
 # component in <out>/values/, then checks that
 #   - components render no Namespace and no Secret objects;
@@ -13,12 +14,13 @@ set -euo pipefail
 
 profile="${1:-gpu}"
 out="${2:-rendered/${profile}}"
+shift $(( $# < 2 ? $# : 2 ))
 helm="${HELM:-helm}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 
 mkdir -p "${out}/values"
 "${helm}" template root "${root}/bootstrap" \
-  -f "${root}/scripts/ci-values.yaml" --set "modelProfile=${profile}" > "${out}/bootstrap.yaml"
+  -f "${root}/scripts/ci-values.yaml" --set "modelProfile=${profile}" "$@" > "${out}/bootstrap.yaml"
 
 python3 - "${root}" "${out}" "${helm}" <<'PY'
 import subprocess, sys, yaml

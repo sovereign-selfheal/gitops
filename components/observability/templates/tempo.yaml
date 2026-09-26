@@ -1,0 +1,27 @@
+# Trace store. The console plugin (UIPlugin distributed-tracing, ansible repo) finds this
+# instance by itself and shows its traces in Observe -> Traces.
+# Multi-tenancy in `openshift` mode (the supported setup on OpenShift): a gateway checks the
+# OpenShift token of every writer and reader. The collector writes to the tenant below with its
+# service account token; the ClusterRole that allows it is in the ansible repo (cluster-scoped).
+apiVersion: tempo.grafana.com/v1alpha1
+kind: TempoMonolithic
+metadata:
+  name: tempo
+spec:
+  storage:
+    traces:
+      backend: pv
+      size: {{ .Values.tempo.storageSize }}
+  multitenancy:
+    enabled: true
+    mode: openshift
+    authentication:
+      - tenantName: {{ .Values.tempo.tenant.name }}
+        tenantId: {{ .Values.tempo.tenant.id | quote }}
+  resources:
+    {{- toYaml .Values.tempo.resources | nindent 4 }}
+  extraConfig:
+    tempo:
+      compactor:
+        compaction:
+          block_retention: {{ .Values.tempo.retention }}

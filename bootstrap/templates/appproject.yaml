@@ -1,4 +1,4 @@
-{{- /* Limits the component Applications to the two workload namespaces. */ -}}
+{{- /* Limits the component Applications to the workload namespaces. */ -}}
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:

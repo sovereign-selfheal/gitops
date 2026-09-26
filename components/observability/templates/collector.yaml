@@ -1,0 +1,48 @@
+# OTLP receiver of the cluster: LiteLLM sends the router spans here (litellm-router component,
+# env OTEL_ENDPOINT). Everything stays in the cluster: the only exporter is the Tempo gateway of
+# this namespace. The collector authenticates with its service account token (ServiceAccount
+# <name>-collector, created by the operator); the ansible repo lets it write the tenant.
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: {{ .Values.collector.name }}
+spec:
+  mode: deployment
+  replicas: {{ .Values.collector.replicas }}
+  resources:
+    {{- toYaml .Values.collector.resources | nindent 4 }}
+  config:
+    extensions:
+      bearertokenauth:
+        filename: /var/run/secrets/kubernetes.io/serviceaccount/token
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+      batch: {}
+    exporters:
+      otlp:
+        # Gateway of TempoMonolithic `tempo` (the operator names it tempo-<name>-gateway).
+        endpoint: {{ printf "tempo-tempo-gateway.%s.svc.cluster.local:4317" .Release.Namespace }}
+        tls:
+          # Service CA of OpenShift, which signs the gateway certificate.
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: {{ .Values.tempo.tenant.name }}
+    service:
+      extensions: [bearertokenauth]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp]

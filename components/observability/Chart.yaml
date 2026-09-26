@@ -1,0 +1,5 @@
+apiVersion: v2
+name: observability
+description: Tempo and the OpenTelemetry collector that receive the traces of the router
+type: application
+version: 0.1.0
