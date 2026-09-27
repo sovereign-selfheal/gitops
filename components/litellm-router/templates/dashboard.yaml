@@ -198,6 +198,7 @@ spec:
                   spec:
                     datasource: {kind: PrometheusDatasource, name: router-prometheus}
                     query: {{ printf "100 * sum(router_requests_total{namespace=%q,routed_to=\"local-fast\"}) / sum(router_requests_total{namespace=%q})" $ns $ns | quote }}
+                    seriesNameFormat: kept in the cluster
       decidedBy:
         kind: Panel
         spec:
@@ -226,10 +227,14 @@ spec:
         spec:
           display:
             name: Decisions per minute
+            description: "Last = decisions in the last minute; Max = the busiest minute of the time range"
           plugin:
             kind: TimeSeriesChart
             spec:
-              legend: {position: bottom}
+              # A table legend shows the numbers without the tooltip: in the OpenShift console
+              # (COO 1.5.2) the tooltip text is white on a white background.
+              legend: {position: right, mode: table, size: medium, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 1}}
               visual: {display: bar, stack: all, palette: {mode: categorical}}
           queries:
             - kind: TimeSeriesQuery
