@@ -98,7 +98,10 @@ scripts/sync-router-code.sh  # copies the hook code of the router repo at a tag,
   the `router` repo at `routerVersion` (see §3). The policies (`chain.yaml`, `privacy-plus.yaml`) are
   maintained here: this repo is their source of truth. They came from the old repo `rhocpai-mvp-routing`
   (read-only); `chain.yaml` has Italian keywords added. When a policy changes, refresh the test copy in
-  `router/tests/policy/`.
+  `router/tests/policy/` and the expected decisions in `cases/routing.yml` of the `validation` repo.
+- **Names used by the `validation` repo**: namespaces, Deployments, labels, PDBs, the ConfigMap
+  `litellm-config`, the API key Secrets and the InferenceService names are listed in `validation/AGENTS.md`
+  §5. When you rename one of them, update that repo too.
 - Comments, docs and commit messages in **English**, level B2/C1: short, clear sentences, no idioms.
 - **Python tools with uv** (`uvx`, `uv run --with`), never pip. The CI pins their versions.
 
