@@ -17,6 +17,10 @@ spec:
     minReplicas: 1
     maxReplicas: 1
     {{- if gt (int $m.gpu) 0 }}
+    # Recreate: stop the old pod before the new one starts. With one GPU per model, a rolling
+    # update deadlocks: the new pod waits for a GPU that the old pod keeps until the new one is Ready.
+    deploymentStrategy:
+      type: Recreate
     # GPU nodes carry this taint (roles/gpu_node_prep in the ansible repo).
     tolerations:
       - key: nvidia.com/gpu
