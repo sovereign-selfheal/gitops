@@ -5,7 +5,7 @@
 # ----- Set by the seed (per cluster) ---------------------------------------------
 # Apps domain of the cluster (ingresses.config/cluster .spec.domain).
 appsDomain: ""
-# Local model profile: `gpu` (Granite on a GPU node) or `cpu` (small Qwen on CPU).
+# Local model profile: `gpu` (Qwen3.8 27B on a GPU node) or `cpu` (small Qwen on CPU).
 modelProfile: gpu
 # External "SOTA" model, OpenAI compatible. enabled: false = local-only mode: the alias
 # sota-smart points to the local model, so every request is served locally.
@@ -70,7 +70,7 @@ secretStore:
 
 # C2 classifier (LLM) of the privacy gate. It runs only in the gray zone of the privacy
 # score, when a prompt is about to go to the SOTA model.
-#   local:    the local model (Granite on GPU) classifies; the prompt never leaves the cluster
+#   local:    the local model (Qwen3.8 27B on GPU) classifies; the prompt never leaves the cluster
 #   external: an external model, settings from the secret store (secretStore.enabled needed)
 #   off:      no classifier, the rules alone decide
 classifier:
@@ -100,28 +100,46 @@ tiers:
 localModel:
   profiles:
     gpu:
-      name: granite-local
-      displayName: Granite 3.3 8B Instruct (local, vLLM GPU)
+      # The name must not contain the SOTA match token of chain.yaml (sota_served_match
+      # "qwen38-27b", compared as bare alphanumerics): local calls would count as SOTA tokens.
+      name: qwen38-local
+      displayName: Qwen3.8 27B NVFP4 (local, vLLM GPU)
       runtime: vllm-cuda-runtime
       runtimeDisplayName: vLLM NVIDIA GPU ServingRuntime for KServe
       runtimeTemplate: vllm-cuda-runtime-template
       # RHOAI 3.5.1 template vllm-cuda-runtime-template, resolved on OCP 4.22.14 on 2026-09-24
+      # (vLLM 0.24.0+rhaiv.13: runs Qwen3.8 with NVFP4, MTP and the qwen3 parsers, checked on 2026-09-28)
       runtimeImage: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:c056e61672b6aea489ad5dde0bd2f8497230f5333e87f7cf6c494eba3bfdc808
       runtimeVersion: v0.24.0
-      # tag granite-3.3-8b-instruct-20260805t2227z, resolved on quay.io on 2026-09-24
-      storageUri: oci://quay.io/redhat-ai-services/modelcar-catalog@sha256:735e0ff14f64d720566e24f21d8e5fa435f8dfcc3416b7614666f8f7d1fd8191
-      # Granite defaults to a 128k context: its KV cache does not fit in 24 GB (NVIDIA L4).
+      # RedHatAI/Qwen3.8-27B-NVFP4 (24.7 GB), built by the modelcar repo.
+      # tag qwen38-27b-nvfp4-d23c6ff, resolved on quay.io on 2026-09-28
+      storageUri: oci://quay.io/sovereign-selfheal/modelcar-qwen38-27b-nvfp4@sha256:07490ed7b3ebbd8105de41712a61a3b206c862afdd48a60e7fde0b1f3a249661
+      # NVFP4 runs natively on NVIDIA Blackwell (AWS g7e, RTX PRO 6000 96 GB). Only 16 of the
+      # 64 layers keep a KV cache (FP8, about 32 KiB per token), so a long context is cheap.
       extraArgs:
-        - --max-model-len=8192
+        - --max-model-len=131072
+        - --gpu-memory-utilization=0.90
+        # Text only: the self-heal agents send no images; skips the vision encoder.
+        - --language-model-only
+        # Tool calls of the agents, and the reasoning moved out of `content`.
+        - --enable-auto-tool-choice
+        - --tool-call-parser=qwen3_xml
+        - --reasoning-parser=qwen3
+        # Answer without reasoning unless the caller asks for it (chat_template_kwargs): faster
+        # for the agents, and the privacy classifier gets its JSON within its token budget.
+        - '--default-chat-template-kwargs={"enable_thinking": false}'
+        # Speculative decoding with the multi-token prediction head shipped with the model.
+        - '--speculative-config={"method": "mtp", "num_speculative_tokens": 3}'
       env: []
       gpu: 1
+      # g7e.2xlarge: 8 vCPU, 64 GiB.
       resources:
         requests:
-          cpu: "1"
-          memory: 6Gi
+          cpu: "2"
+          memory: 16Gi
         limits:
-          cpu: "3"
-          memory: 12Gi
+          cpu: "6"
+          memory: 40Gi
     cpu:
       name: qwen25-05b-local
       displayName: Qwen2.5 0.5B Instruct (local, vLLM CPU)

@@ -13,7 +13,7 @@ client ──> Route maas-router (ansible) ──> Gateway openshift-ai-inferenc
            │  AuthPolicy also refuses /metrics (403)                ┘
            └──> LiteLLM (component litellm-router): efficiency gate, then privacy gate
                   ├── Presidio analyzer (component presidio): PII detection, EN + IT
-                  ├── local model (component local-model): Granite 3.3 8B on GPU, or Qwen2.5 0.5B on CPU
+                  ├── local model (component local-model): Qwen3.8 27B on GPU, or Qwen2.5 0.5B on CPU
                   ├── external SOTA model (OpenAI compatible), fallback to the local model
                   ├ ─ traces (OTLP) ─> collector otel ─> Tempo (component observability)
                   └ ─ metrics :9091 <─ user workload Prometheus (ServiceMonitor litellm)
@@ -47,7 +47,7 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 | Value | Example | Meaning |
 |---|---|---|
 | `appsDomain` | `apps.cluster.example.com` | Apps domain; the router answers on `router.<appsDomain>` |
-| `modelProfile` | `gpu` | `gpu`: Granite 3.3 8B Instruct on a GPU node; `cpu`: Qwen2.5 0.5B on CPU |
+| `modelProfile` | `gpu` | `gpu`: Qwen3.8 27B (NVFP4) on a GPU node; `cpu`: Qwen2.5 0.5B on CPU |
 | `sota.enabled` | `true` | `false` = local-only mode (see below) |
 | `sota.apiBase` | `https://provider.example.com/v1` | External OpenAI-compatible endpoint |
 | `sota.model` | `openai/<model-id>` | LiteLLM model string of the external model |
@@ -107,7 +107,7 @@ extra opinion. `classifier.mode` selects that LLM:
 
 | Mode | Classifier | Notes |
 |---|---|---|
-| `local` (default) | The local model (Granite on GPU) | The prompt never leaves the cluster, also while it is classified. No secret needed |
+| `local` (default) | The local model (Qwen3.8 27B on GPU) | The prompt never leaves the cluster, also while it is classified. No secret needed |
 | `external` | An external model | Settings from the secret store (`classifier-provider-secret`) |
 | `off` | None | The rules alone decide |
 

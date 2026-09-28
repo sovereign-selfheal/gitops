@@ -30,8 +30,9 @@ spec:
         - --model=/mnt/models
         # KServe placeholder, replaced with the InferenceService name (not a Helm value).
         - --served-model-name={{ "{{.Name}}" }}
+        # extraArgs are quoted: some carry JSON, and ": " would break a plain YAML scalar.
         {{- range $m.extraArgs }}
-        - {{ . }}
+        - {{ . | quote }}
         {{- end }}
       env:
         - name: HF_HOME

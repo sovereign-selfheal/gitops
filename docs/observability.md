@@ -133,7 +133,7 @@ Then, in the console:
 1. *Observe → Traces*. Select the Tempo instance `observability / tempo` and the tenant `router`.
 2. Filter on the service `litellm-router`, or paste a trace id from the log.
 3. Open the trace. In `gate.privacy` of the first request, `privacy.signals` shows `credit_card` and
-   the score above the threshold, and `litellm_request` calls the `granite-local-predictor` service in
+   the score above the threshold, and `litellm_request` calls the `qwen38-local-predictor` service in
    `local-models`. In the second request both gates say `sota` and `litellm_request` calls the external
    provider.
 
