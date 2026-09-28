@@ -30,6 +30,12 @@ the cluster: the collector, Tempo and Prometheus run in the cluster, and nothing
   gates), and links to *Observe → Traces* with the same filters.
 - **Models**: tokens per minute, answer time p90 and privacy score, by model.
 
+![Routing decisions section of the dashboard](images/dashboard-routing-decisions.png)
+
+*The section Routing decisions after one run of the `validation` repo (default groups) on a new
+cluster, 2026-09-28: 18 requests, 10 kept LOCAL and 8 sent to SOTA. The query of the gauge returns 55.6%; the console
+shows it as 60%.*
+
 The counters count since the start of the LiteLLM pods (2 replicas, summed). The dashboard reads Thanos
 and Tempo through Perses with the token of the console user. The application menu of the console (grid
 icon) also has the section *Sovereign Self-Healing demo* with the same trace links (ansible repo).
