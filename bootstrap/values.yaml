@@ -121,13 +121,15 @@ localModel:
         - --gpu-memory-utilization=0.90
         # Text only: the self-heal agents send no images; skips the vision encoder.
         - --language-model-only
-        # Tool calls of the agents, and the reasoning moved out of `content`.
+        # Tool calls of the agents, and the reasoning moved out of `content`. The model reasons
+        # by default (thinking mode, the mode of the published benchmarks); the sampling
+        # defaults of its generation_config.json (temperature 1.0, top_p 0.95, top_k 20) are the
+        # recommended ones for this mode. A caller turns it off with
+        # chat_template_kwargs.enable_thinking=false, as the privacy classifier does
+        # (CLASSIFIER_CHAT_TEMPLATE_KWARGS in components/litellm-router).
         - --enable-auto-tool-choice
         - --tool-call-parser=qwen3_xml
         - --reasoning-parser=qwen3
-        # Answer without reasoning unless the caller asks for it (chat_template_kwargs): faster
-        # for the agents, and the privacy classifier gets its JSON within its token budget.
-        - '--default-chat-template-kwargs={"enable_thinking": false}'
         # Speculative decoding with the multi-token prediction head shipped with the model.
         - '--speculative-config={"method": "mtp", "num_speculative_tokens": 3}'
       env: []

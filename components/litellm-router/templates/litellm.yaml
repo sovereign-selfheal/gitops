@@ -73,6 +73,11 @@ spec:
               value: {{ .Values.global.localModel.name | quote }}
             - name: CLASSIFIER_GRAY_LOW
               value: {{ .Values.global.classifier.grayLow | quote }}
+            # The local model reasons by default (Qwen3). The classifier needs a short JSON
+            # verdict within its token budget, so its calls turn the reasoning off
+            # (router v0.6.0 or later; a model without this switch ignores it).
+            - name: CLASSIFIER_CHAT_TEMPLATE_KWARGS
+              value: '{"enable_thinking": false}'
             {{- end }}
             {{- with .Values.global.sota.servedMatch }}
             # Overrides sota_served_match in chain.yaml (cost gate).
