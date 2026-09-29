@@ -83,7 +83,7 @@ open only to the monitoring namespaces, and the public route refuses `/metrics` 
 |---|---|---|
 | `router_requests_total` | `routed_to`, `decided_by`, `team` | One per routing decision |
 | `router_privacy_score` (histogram) | `team` (threshold key) | Privacy score of the requests that reached the privacy gate |
-| `router_sota_budget_used_tokens` (gauge) | `pod` | SOTA tokens counted by the efficiency gate budget. **Per pod** (2 replicas): the real cap is up to twice `sota_token_budget` |
+| `router_sota_budget_used_tokens` (gauge) | `pod` | SOTA tokens counted by the efficiency gate budget. Always 0 while the cap is off (`sota_token_budget: 0`, the default). **Per pod** when it is on |
 | `litellm_total_tokens_metric_total` | `requested_model`, ... | Tokens per model alias (`local-fast`, `sota-smart`), from LiteLLM |
 | `litellm_deployment_successful_fallbacks_total` | `requested_model`, `fallback_model` | A SOTA call failed and LiteLLM used `local-fast` |
 | `litellm_request_total_latency_metric` (histogram) | `requested_model`, ... | End-to-end latency per model, from LiteLLM |
