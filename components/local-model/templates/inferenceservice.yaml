@@ -12,6 +12,9 @@ metadata:
     # Links the model to its runtime in the RHOAI dashboard.
     opendatahub.io/template-name: {{ $m.runtimeTemplate }}
     opendatahub.io/template-display-name: {{ $m.runtimeDisplayName }}
+    # Links the model to its hardware profile (templates/hardwareprofile.yaml).
+    opendatahub.io/hardware-profile-name: {{ include "local-model.hardwareProfileName" . }}
+    opendatahub.io/hardware-profile-namespace: {{ .Release.Namespace }}
 spec:
   predictor:
     minReplicas: 1
@@ -21,11 +24,12 @@ spec:
     # update deadlocks: the new pod waits for a GPU that the old pod keeps until the new one is Ready.
     deploymentStrategy:
       type: Recreate
-    # GPU nodes carry this taint (roles/gpu_node_prep in the ansible repo).
+    # Same scheduling as the hardware profile: the webhook copies the profile scheduling here,
+    # so Git declares it too.
+    nodeSelector:
+      {{- include "local-model.gpuNodeSelector" . | nindent 6 }}
     tolerations:
-      - key: nvidia.com/gpu
-        operator: Exists
-        effect: NoSchedule
+      {{- include "local-model.gpuTolerations" . | nindent 6 }}
     {{- end }}
     model:
       runtime: {{ $m.runtime }}

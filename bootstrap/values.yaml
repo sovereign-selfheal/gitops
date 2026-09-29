@@ -145,6 +145,10 @@ localModel:
         limits:
           cpu: "6"
           memory: 40Gi
+      # RHOAI hardware profile shown in the dashboard (components/local-model/templates/hardwareprofile.yaml).
+      hardwareProfile:
+        displayName: NVIDIA RTX PRO 6000 (g7e.2xlarge)
+        description: One NVIDIA RTX PRO 6000 Blackwell GPU (96 GB) on an AWS g7e.2xlarge node.
     cpu:
       name: qwen25-05b-local
       displayName: Qwen2.5 0.5B Instruct (local, vLLM CPU)
@@ -168,6 +172,9 @@ localModel:
         limits:
           cpu: "4"
           memory: 8Gi
+      hardwareProfile:
+        displayName: CPU only (vLLM CPU)
+        description: CPU and memory only, no GPU.
 
 # ----- Components (one Argo CD Application each) --------------------------------
 # wave: Argo CD sync wave of the Application; namespaceRef: key in `namespaces` above.
