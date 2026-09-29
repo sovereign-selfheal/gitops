@@ -51,11 +51,15 @@ litellm_settings:
     - otel
     {{- end }}
   drop_params: true
-  num_retries: 2
-  request_timeout: 120
+  num_retries: {{ .Values.numRetries }}
+  request_timeout: {{ .Values.requestTimeout }}
 
 router_settings:
   fallbacks: [{"sota-smart": ["local-fast"]}]
+  {{- with .Values.retryPolicy }}
+  retry_policy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 
 general_settings:
   # Streaming answers end with the token usage, even if the client does not ask for it:
