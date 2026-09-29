@@ -40,6 +40,20 @@ The counters count since the start of the LiteLLM pods (2 replicas, summed). The
 and Tempo through Perses with the token of the console user. The application menu of the console (grid
 icon) also has the section *Sovereign Self-Healing demo* with the same trace links (ansible repo).
 
+## The dashboard for the audience
+
+*Observe → Dashboards*, project `maas-routing`, dashboard **Sovereign AI - at a glance**
+(`sovereign-at-a-glance`, component `litellm-router`, only with `observability.enabled`). A few big
+numbers for the time range at the top (default 30 minutes), for the audience of the demo:
+
+- requests kept in the cluster (share), tokens processed in the cluster, tokens sent to the external
+  model, sensitive requests kept local (privacy gate), requests over the token budget (429);
+- live: requests and tokens per minute, in the cluster and to the external model; with the `gpu`
+  profile also how busy the local GPU is.
+
+The numbers use `increase()` over the time range: a series that starts inside the range (a new pod)
+misses its first requests, so they are close, not exact. The details are in the two other dashboards.
+
 ## The operations dashboard
 
 *Observe → Dashboards*, project `maas-routing`, dashboard **Sovereign stack - operations** (component

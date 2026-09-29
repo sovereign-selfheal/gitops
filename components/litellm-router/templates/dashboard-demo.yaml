@@ -1,0 +1,231 @@
+{{- if .Values.global.observability.enabled }}
+{{- $ns := .Release.Namespace }}
+{{- $local := .Values.global.localModel.name }}
+{{- $kuadrant := .Values.dashboard.kuadrantNamespace }}
+{{- $gpu := eq .Values.global.modelProfile "gpu" }}
+# Perses dashboard for the audience of the demo (Observe -> Dashboards, project {{ $ns }}): a few
+# big numbers for the time range chosen at the top. The details are in routing-decisions (demo)
+# and stack-operations (team). The numbers use increase() over the time range: a series that
+# starts inside the range (a new pod) misses its first requests, so they are close, not exact.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: sovereign-at-a-glance
+spec:
+  config:
+    display:
+      name: Sovereign AI - at a glance
+      description: What stayed in the cluster and what went to the external model, for the time range at the top.
+    duration: 30m
+    refreshInterval: 15s
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: In the selected time range
+          items:
+            - {x: 0, "y": 0, width: 6, height: 7, content: {$ref: "#/spec/panels/keptShare"}}
+            - {x: 6, "y": 0, width: 5, height: 7, content: {$ref: "#/spec/panels/tokensLocal"}}
+            - {x: 11, "y": 0, width: 5, height: 7, content: {$ref: "#/spec/panels/tokensSota"}}
+            - {x: 16, "y": 0, width: 4, height: 7, content: {$ref: "#/spec/panels/privacyKept"}}
+            - {x: 20, "y": 0, width: 4, height: 7, content: {$ref: "#/spec/panels/refused"}}
+      - kind: Grid
+        spec:
+          display:
+            title: Live
+          items:
+            - {x: 0, "y": 0, width: {{ ternary 9 12 $gpu }}, height: 9, content: {$ref: "#/spec/panels/requestsLive"}}
+            - {x: {{ ternary 9 12 $gpu }}, "y": 0, width: {{ ternary 9 12 $gpu }}, height: 9, content: {$ref: "#/spec/panels/tokensLive"}}
+            {{- if $gpu }}
+            - {x: 18, "y": 0, width: 6, height: 9, content: {$ref: "#/spec/panels/gpuBusy"}}
+            {{- end }}
+    panels:
+      keptShare:
+        kind: Panel
+        spec:
+          display:
+            name: Requests kept in the cluster
+            description: Share of the requests answered by the local model
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: percent, decimalPlaces: 0}
+              colorMode: background_solid
+              thresholds: {defaultColor: "#3e8635", steps: []}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "100 * sum(increase(router_requests_total{namespace=%q,routed_to=\"local-fast\"}[$__range])) / (sum(increase(router_requests_total{namespace=%q}[$__range])) > 0) or vector(0)" $ns $ns | quote }}
+      tokensLocal:
+        kind: Panel
+        spec:
+          display:
+            name: Tokens processed in the cluster
+            description: Prompt and answer tokens of the local model
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0, shortValues: true}
+              colorMode: background_solid
+              thresholds: {defaultColor: "#3e8635", steps: []}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(increase(litellm_total_tokens_metric_total{namespace=%q,model=%q}[$__range])) or vector(0)" $ns $local | quote }}
+      tokensSota:
+        kind: Panel
+        spec:
+          display:
+            name: Tokens sent to the external model
+            description: Prompt, answer and reasoning tokens of the SOTA model (0 in local-only mode)
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0, shortValues: true}
+              colorMode: background_solid
+              thresholds: {defaultColor: "#0066cc", steps: []}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(increase(litellm_total_tokens_metric_total{namespace=%q,model!=%q}[$__range])) or vector(0)" $ns $local | quote }}
+      privacyKept:
+        kind: Panel
+        spec:
+          display:
+            name: Sensitive requests kept local
+            description: Requests that the privacy gate kept in the cluster
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              colorMode: background_solid
+              thresholds: {defaultColor: "#5e40be", steps: []}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "round(sum(increase(router_requests_total{namespace=%q,decided_by=\"privacy\"}[$__range]))) or vector(0)" $ns | quote }}
+      refused:
+        kind: Panel
+        spec:
+          display:
+            name: Requests over the token budget
+            description: Requests refused by the gateway (HTTP 429) because the tier used its token budget
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              colorMode: background_solid
+              thresholds: {defaultColor: "#f0ab00", steps: []}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "round(sum(increase(limited_calls{namespace=%q}[$__range]))) or vector(0)" $kuadrant | quote }}
+      requestsLive:
+        kind: Panel
+        spec:
+          display:
+            name: Requests per minute
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom}
+              yAxis: {format: {unit: decimal, decimalPlaces: 1}}
+              visual: {display: line, lineWidth: 2, areaOpacity: 0.3, stack: all}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(rate(router_requests_total{namespace=%q,routed_to=\"local-fast\"}[$__rate_interval])) * 60" $ns | quote }}
+                    seriesNameFormat: In the cluster
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(rate(router_requests_total{namespace=%q,routed_to!=\"local-fast\"}[$__rate_interval])) * 60" $ns | quote }}
+                    seriesNameFormat: External model
+      tokensLive:
+        kind: Panel
+        spec:
+          display:
+            name: Tokens per minute
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom}
+              yAxis: {format: {unit: decimal, decimalPlaces: 0, shortValues: true}}
+              visual: {display: line, lineWidth: 2, areaOpacity: 0.3, stack: all}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(rate(litellm_total_tokens_metric_total{namespace=%q,model=%q}[$__rate_interval])) * 60" $ns $local | quote }}
+                    seriesNameFormat: In the cluster
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(rate(litellm_total_tokens_metric_total{namespace=%q,model!=%q}[$__rate_interval])) * 60" $ns $local | quote }}
+                    seriesNameFormat: External model
+      {{- if $gpu }}
+      gpuBusy:
+        kind: Panel
+        spec:
+          display:
+            name: Local GPU busy
+            description: Utilization of the GPUs of the local model (NVIDIA DCGM exporter)
+          plugin:
+            kind: GaugeChart
+            spec:
+              calculation: last-number
+              format: {unit: percent, decimalPlaces: 0}
+              max: 100
+              thresholds:
+                defaultColor: "#3e8635"
+                steps:
+                  - {value: 80, color: "#f0ab00"}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "avg(DCGM_FI_DEV_GPU_UTIL{exported_namespace=%q}) or vector(0)" .Values.global.namespaces.models | quote }}
+                    seriesNameFormat: GPU
+      {{- end }}
+{{- end }}
