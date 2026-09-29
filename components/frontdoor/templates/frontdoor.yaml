@@ -54,6 +54,8 @@ spec:
           x-team:
             plain:
               expression: auth.identity.metadata.labels["maas-group"]
+        # auth.tier.group: read by the TokenRateLimitPolicy below and by the TelemetryPolicy
+        # of the ansible repo (label `tier` on the Limitador metrics). Rename both together.
         filters:
           tier:
             json:
