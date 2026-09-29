@@ -1,0 +1,16 @@
+# `global` is passed by the bootstrap chart. The default below exists only so that
+# `helm lint` works (no key of `global` is read by this component).
+global: {}
+
+# Image of the quarkus-buggy-app repo (github.com/sovereign-selfheal/quarkus-buggy-app):
+# Quarkus 3 REST service, built with the Jib extension (no Dockerfile).
+# tag TBD, resolved on quay.io on TBD
+image: quay.io/sovereign-selfheal/quarkus-buggy-app@sha256:0000000000000000000000000000000000000000000000000000000000000
+replicas: 1
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

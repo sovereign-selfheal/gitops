@@ -15,8 +15,8 @@ here. After that, Argo CD owns every object described in this repo.
 
 | Owner | Objects |
 |---|---|
-| `ansible` | Operators, DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, the metric monitors of Limitador and Authorino, the `TelemetryPolicy` `openshift-ai-inference-labels` (label `tier` on the Limitador counters, read from the `tier` filter of the AuthPolicy `litellm-apikey`: rename both together), GPU nodes, the namespaces `local-models` and `maas-routing`, the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), the model image pre-pull DaemonSets (namespace `sovereign-selfheal-prepull`), Argo CD settings, the root Application, the observability operators (OpenTelemetry, Tempo, Cluster Observability), the `UIPlugin` `distributed-tracing`, the Tempo tenant write permission (ClusterRole + binding), the namespace `observability`, user workload monitoring, team access when `team_users` is set (Keycloak in `keycloak` when Ansible installs it, OAuth IdP, `Group/selfheal-team` + ClusterRoleBinding, the Argo CD RBAC line `g, selfheal-team, role:admin`) |
-| `gitops` (this repo) | Every object inside `local-models`, `maas-routing` and `observability` |
+| `ansible` | Operators (including the RHOAI **MCP lifecycle operator**, needed for the `MCPServer` CRs of `components/prometheus-mcp-server` and `components/ticketing-mcp-server`), DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, the metric monitors of Limitador and Authorino, the `TelemetryPolicy` `openshift-ai-inference-labels` (label `tier` on the Limitador counters, read from the `tier` filter of the AuthPolicy `litellm-apikey`: rename both together), GPU nodes, the namespaces `local-models`, `maas-routing` and `agentic-triage`, the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), the model image pre-pull DaemonSets (namespace `sovereign-selfheal-prepull`), the `ClusterRoleBinding` of the `prometheus-mcp-server-sa` ServiceAccount (namespace `agentic-triage`) to the built-in `cluster-monitoring-view` ClusterRole, Argo CD settings, the root Application, the observability operators (OpenTelemetry, Tempo, Cluster Observability), the `UIPlugin` `distributed-tracing`, the Tempo tenant write permission (ClusterRole + binding), the namespace `observability`, user workload monitoring, team access when `team_users` is set (Keycloak in `keycloak` when Ansible installs it, OAuth IdP, `Group/selfheal-team` + ClusterRoleBinding, the Argo CD RBAC line `g, selfheal-team, role:admin`) |
+| `gitops` (this repo) | Every object inside `local-models`, `maas-routing`, `observability` and `agentic-triage` |
 
 - **Namespaces** are created by Ansible with the label `argocd.argoproj.io/managed-by: openshift-gitops`.
   The default Argo CD instance can manage only namespaces with this label, and it cannot create Namespaces.
@@ -31,6 +31,11 @@ here. After that, Argo CD owns every object described in this repo.
   runs on the `gpu-decision` GPU pool of the ansible repo (node label `node-role.kubernetes.io/gpu-decision`).
   When you change `decisionModel.storageUri` or `.runtimeImage`, update `model_prepull_decision_images` in
   the ansible repo with the same digests.
+- **Tiers**: `tiers` (bootstrap/values.yaml) lists both human API-key tiers (`research`, `legal`) and the
+  `agents` tier used by `components/triage-agent`'s own router credential. Each tier gets a token-budget
+  rule (`TokenRateLimitPolicy`, component `frontdoor`); a component that needs its own credential (because
+  it runs in a different namespace than `components/secrets`) generates its own `Password`/`ExternalSecret`
+  labelled with one of these tier names (see `components/triage-agent/templates/apikey.yaml`).
 - **Observability**: this repo deploys the Tempo instance `tempo` (kind `TempoMonolithic`, multi-tenancy
   `openshift`, tenant `router`) and the OpenTelemetry collector `otel` (kind `OpenTelemetryCollector`; the
   operator names its Service and ServiceAccount `otel-collector`) in the namespace `observability`. OTLP
@@ -76,7 +81,38 @@ These two repos build the custom images and own the router code. The same rules 
    image serves `POST /analyze` on port 3000 for `en` and `it`. Changes to these come with a minor
    version of the other repo (see its AGENTS.md).
 
-## 4. Layout
+## 4. Contract with the AI-driven triage demo repos
+
+Four repos own the source and the build of the `agentic-triage` namespace workloads (imported from
+`matteo-grimaldi/ocp-trobleshooter-demo`). Unlike `router`, none of them has a code-copy contract with
+this repo: this repo only pins their image digests, same as `presidio`.
+
+| Owner | Items |
+|---|---|
+| `triage-agent` | Gradio UI (`app.py`, `agent.py`), a thin client of the OGX sidecar's Responses API, the static `knowledge.md` (baked into the image), image `quay.io/sovereign-selfheal/triage-agent` |
+| `mock-ticketing-system` | Two subfolders, two images: `ticketing-system` (FastAPI ServiceNow simulator) and `ticketing-mcp-server` (FastMCP wrapper), `quay.io/sovereign-selfheal/ticketing-system` and `quay.io/sovereign-selfheal/ticketing-mcp-server` |
+| `quarkus-buggy-app` | Quarkus 3 source, built with the Jib extension, image `quay.io/sovereign-selfheal/quarkus-buggy-app` |
+| `prometheus-mcp-server` | FastMCP server wrapping PromQL against Thanos, image `quay.io/sovereign-selfheal/prometheus-mcp-server` |
+| `gitops` (this repo) | Every Kubernetes object in `agentic-triage` (`components/quarkus-buggy-app`, `components/ticketing-system`, `components/ticketing-mcp-server`, `components/prometheus-mcp-server`, `components/triage-agent`), the image digests in use, including the third-party OGX sidecar image and its `stack_run_config.yaml` (ConfigMap, `components/triage-agent/templates/stack-run-config.yaml`) |
+
+1. **Images by digest.** Same pin convention as §3: `# tag vX.Y.Z, resolved on quay.io on <date>`. A new
+   version is a PR here. The OGX sidecar (`docker.io/ogxai/distribution-starter`) follows the same rule
+   even though it is not a `sovereign-selfheal` image and has no source-code contract with this repo
+   (comment says `# tag <tag>, resolved on docker.io on <date>` instead of quay.io).
+2. **No external model backend.** `triage-agent`'s OGX sidecar has no external MaaS endpoint (unlike the
+   upstream demo it is based on): it is configured (`VLLM_URL` in the Deployment, `stack_run_config.yaml`)
+   to call the platform's own gateway (`https://router.<appsDomain>/v1`, model `auto`), so the same policy
+   hook and privacy gate that apply to every other client also apply to the agent's traffic. OGX itself
+   (the server-side agentic loop and native MCP tool calling) is kept — only its backend target changed.
+3. **MCP servers.** `components/prometheus-mcp-server` and `components/ticketing-mcp-server` render
+   `MCPServer` CRs (`mcp.x-k8s.io/v1alpha1`), reconciled by the ansible-owned MCP lifecycle operator (§2).
+   OGX calls their `server_url` directly (`tools=[{"type": "mcp", ...}]`); `components/triage-agent` does
+   not run its own MCP client.
+4. **Known gap.** The upstream demo's Kubernetes-API MCP server (pod/log/event access) is not part of
+   this import; `triage-agent`'s `OCP_MCP_URL` is empty by default. Set `components/triage-agent`'s
+   `ocpMcpUrl` value if such a server is deployed separately.
+
+## 5. Layout
 
 ```
 bootstrap/            # Helm chart of the root Application: AppProject + one Application per component
@@ -91,7 +127,7 @@ scripts/sync-router-code.sh  # copies the hook code of the router repo at a tag,
 - A component's `values.yaml` has `global` defaults only so that `helm lint` works. The real values come
   from bootstrap.
 
-## 5. Conventions
+## 6. Conventions
 
 - **Helm 3.** Argo CD renders the charts with Helm 3, so do not use Helm 4-only features. CI uses Helm 3.
 - **No cluster-specific values in templates.** Domains, endpoints and model choices are values.
@@ -111,7 +147,7 @@ scripts/sync-router-code.sh  # copies the hook code of the router repo at a tag,
 - Comments, docs and commit messages in **English**, level B2/C1: short, clear sentences, no idioms.
 - **Python tools with uv** (`uvx`, `uv run --with`), never pip. The CI pins their versions.
 
-## 6. Before you open a PR
+## 7. Before you open a PR
 
 ```bash
 uvx yamllint .
@@ -124,14 +160,15 @@ for p in gpu cpu; do uv run --no-project --with pyyaml scripts/render.sh "$p" "r
 kubeconform does not know the CRDs (KServe, Kuadrant, ESO, Argo CD). To validate those objects, use a
 server-side dry run on a cluster: `oc apply --dry-run=server -n <namespace> -f rendered/gpu/<component>.yaml`.
 
-## 7. Out of scope
+## 8. Out of scope
 
 - Operators, CRDs, RBAC, namespaces, cluster-scoped objects → `ansible` repo.
-- Application source code and container builds → `router`, `presidio`, `agents`, `sample-app` repos. The
-  LiteLLM hook code is developed in `router` and shipped here in a ConfigMap (see §3).
+- Application source code and container builds → `router`, `presidio`, `triage-agent`,
+  `mock-ticketing-system`, `quarkus-buggy-app`, `prometheus-mcp-server` repos. The LiteLLM hook code is
+  developed in `router` and shipped here in a ConfigMap (see §3).
 
-## 8. When in doubt
+## 9. When in doubt
 
 - Prefer the smallest change that keeps the rendered output and the contract valid.
 - Ask before changing a pin, the ownership of an object, the values contract with the seed, or the
-  contract with the `router` and `presidio` repos.
+  contract with the `router`, `presidio` and AI-driven triage demo repos.

@@ -1,0 +1,15 @@
+# `global` is passed by the bootstrap chart. The default below exists only so that
+# `helm lint` works (no key of `global` is read by this component).
+global: {}
+
+# Image of the prometheus-mcp-server repo (github.com/sovereign-selfheal/prometheus-mcp-server).
+# tag TBD, resolved on quay.io on TBD
+image: quay.io/sovereign-selfheal/prometheus-mcp-server@sha256:0000000000000000000000000000000000000000000000000000000000000
+replicas: 1
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

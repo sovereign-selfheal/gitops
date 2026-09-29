@@ -1,0 +1,57 @@
+# MCPServer CR (RHOAI MCP lifecycle operator, ansible-owned). The operator creates the
+# Deployment, Service and probes, and registers the server in the OpenShift AI MCP catalog.
+apiVersion: mcp.x-k8s.io/v1alpha1
+kind: MCPServer
+metadata:
+  name: ticketing-mcp-server
+  labels:
+    app: ticketing-mcp-server
+spec:
+  source:
+    type: ContainerImage
+    containerImage:
+      ref: {{ .Values.image }}
+
+  config:
+    port: 8080
+    path: /mcp
+    env:
+      - name: MCP_PORT
+        value: "8080"
+      # In-cluster URL of components/ticketing-system, same namespace.
+      - name: TICKETING_API_URL
+        value: {{ printf "http://ticketing-system.%s.svc:8080" (required "global.namespaces.triage is required" .Values.global.namespaces.triage) | quote }}
+      - name: PYTHONUNBUFFERED
+        value: "1"
+
+  runtime:
+    replicas: {{ .Values.replicas }}
+    resources:
+      {{- toYaml .Values.resources | nindent 6 }}
+    security:
+      podSecurityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        capabilities:
+          drop: ["ALL"]
+    health:
+      livenessProbe:
+        tcpSocket:
+          port: 8080
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        failureThreshold: 3
+      readinessProbe:
+        tcpSocket:
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        failureThreshold: 3
+
+  mcp:
+    stateless: true

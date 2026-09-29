@@ -1,0 +1,18 @@
+# `global` is passed by the bootstrap chart. The default below exists only so that
+# `helm lint` works.
+global:
+  namespaces:
+    triage: agentic-triage
+
+# Image of the mock-ticketing-system repo (github.com/sovereign-selfheal/mock-ticketing-system),
+# subfolder ticketing-mcp-server: FastMCP wrapper (streamable-http, path /mcp).
+# tag TBD, resolved on quay.io on TBD
+image: quay.io/sovereign-selfheal/ticketing-mcp-server@sha256:0000000000000000000000000000000000000000000000000000000000000
+replicas: 1
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

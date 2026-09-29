@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quarkus-buggy-app
+  labels:
+    app: quarkus-buggy-app
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: quarkus-buggy-app
+  template:
+    metadata:
+      labels:
+        app: quarkus-buggy-app
+    spec:
+      containers:
+        - name: quarkus-buggy-app
+          image: {{ .Values.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: quarkus-buggy-app
+  labels:
+    app: quarkus-buggy-app
+  annotations:
+    # Redundant with the ServiceMonitor below (user workload monitoring uses the
+    # ServiceMonitor), kept only for tools that discover targets from Service annotations.
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/q/metrics"
+    prometheus.io/port: "8080"
+spec:
+  selector:
+    app: quarkus-buggy-app
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# The triage-agent demo needs a way to poke the app manually (Act 1/Act 4 of the demo
+# script); the app itself already generates its own load (TrafficGenerator).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: quarkus-buggy-app
+  labels:
+    app: quarkus-buggy-app
+spec:
+  to:
+    kind: Service
+    name: quarkus-buggy-app
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+# Tells the user-workload Prometheus Operator to scrape the Quarkus metrics (error rate,
+# latency), which prometheus-mcp-server and the triage-agent query through Thanos.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: quarkus-buggy-app
+  labels:
+    app: quarkus-buggy-app
+spec:
+  selector:
+    matchLabels:
+      app: quarkus-buggy-app
+  endpoints:
+    - port: http
+      path: /q/metrics
+      interval: 15s
+      scheme: http
