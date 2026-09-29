@@ -34,10 +34,10 @@ Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/obser
 
 Presidio and LiteLLM run 2 replicas each (value `replicas` of the component), so one pod or node can
 fail without stopping the router. A preferred pod anti-affinity puts the replicas on different nodes
-when it can; it never blocks scheduling. The SOTA token cap of the router (`sota_token_budget` in
-`components/litellm-router/files/chain.yaml`) is counted in memory per pod, so with 2 replicas the real
-cap is up to twice the value. The token budgets per tier (TokenRateLimitPolicy) are shared and are the
-real limit.
+when it can; it never blocks scheduling. The token budgets per tier (TokenRateLimitPolicy) are shared by
+all pods: Limitador keeps one counter per tier. The SOTA token cap of the router (`sota_token_budget` in
+`components/litellm-router/files/chain.yaml`) is off (0): it would count in memory per pod, with no time
+window. The spend limit on SOTA is the quota of the provider on its API key.
 
 ## Values
 

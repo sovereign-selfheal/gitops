@@ -311,8 +311,8 @@ spec:
                   kind: PrometheusTimeSeriesQuery
                   spec:
                     datasource: {kind: PrometheusDatasource, name: router-prometheus}
-                    query: {{ printf "sum by (requested_model) (rate(litellm_total_tokens_metric_total{namespace=%q}[$__rate_interval])) * 60" $ns | quote }}
-                    seriesNameFormat: {{ "{{requested_model}}" | quote }}
+                    query: {{ printf "sum by (requested_model, model) (rate(litellm_total_tokens_metric_total{namespace=%q}[$__rate_interval])) * 60" $ns | quote }}
+                    seriesNameFormat: {{ "{{requested_model}} ({{model}})" | quote }}
       latency:
         kind: Panel
         spec:
@@ -330,8 +330,8 @@ spec:
                   kind: PrometheusTimeSeriesQuery
                   spec:
                     datasource: {kind: PrometheusDatasource, name: router-prometheus}
-                    query: {{ printf "histogram_quantile(0.9, sum by (le, requested_model) (rate(litellm_request_total_latency_metric_bucket{namespace=%q}[$__rate_interval])))" $ns | quote }}
-                    seriesNameFormat: {{ "{{requested_model}}" | quote }}
+                    query: {{ printf "histogram_quantile(0.9, sum by (le, requested_model, model) (rate(litellm_request_total_latency_metric_bucket{namespace=%q}[$__rate_interval])))" $ns | quote }}
+                    seriesNameFormat: {{ "{{requested_model}} ({{model}})" | quote }}
       privacyScore:
         kind: Panel
         spec:

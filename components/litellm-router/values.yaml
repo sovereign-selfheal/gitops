@@ -55,8 +55,8 @@ retryPolicy:
   InternalServerErrorRetries: 1
   ServiceUnavailableErrorRetries: 1
   DefaultRetries: 1
-# Two replicas, preferably on different nodes. The SOTA token counter of the policy hook
-# (sota_token_budget in files/chain.yaml) is per pod.
+# Two replicas, preferably on different nodes. If the SOTA token cap of the policy hook is on
+# (sota_token_budget in files/chain.yaml, off by default), its counter is per pod.
 replicas: 2
 resources:
   requests:
