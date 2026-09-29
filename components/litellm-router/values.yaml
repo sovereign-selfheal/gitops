@@ -35,6 +35,26 @@ dashboard:
 # Port of the metrics server of the hook (env ROUTER_METRICS_PORT, router v0.5.0+): router
 # metrics and LiteLLM metrics. Not exposed by the gateway.
 metricsPort: 9091
+# Timeout of one call to the local model (local-fast, auto, and sota-smart in local-only mode);
+# the SOTA model has global.sota.timeout. Without streaming the whole answer must fit: Qwen3.8
+# writes about 80 tokens/s per request (about 60 with 20 requests at once), and 85-92% of them are
+# reasoning. 540 s is about 43k tokens. A streaming answer is not cut while tokens flow. Keep it
+# below the 600 s of the Route and the load balancer (ansible repo).
+requestTimeout: 540
+# Retries per error type (LiteLLM router_settings.retry_policy). A timeout is not retried: the
+# same work would run again on the GPU, and the client would wait up to 3 x requestTimeout.
+# A key that is not set uses DefaultRetries (502, 504, connection errors). numRetries must stay
+# above 0, otherwise LiteLLM ignores retry_policy.
+numRetries: 2
+retryPolicy:
+  TimeoutErrorRetries: 0
+  BadRequestErrorRetries: 0
+  AuthenticationErrorRetries: 0
+  RateLimitErrorRetries: 0
+  ContentPolicyViolationErrorRetries: 0
+  InternalServerErrorRetries: 1
+  ServiceUnavailableErrorRetries: 1
+  DefaultRetries: 1
 # Two replicas, preferably on different nodes. The SOTA token counter of the policy hook
 # (sota_token_budget in files/chain.yaml) is per pod.
 replicas: 2

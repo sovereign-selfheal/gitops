@@ -87,7 +87,9 @@ The routing decisions are visible as traces in the console (*Observe → Traces*
 ## Long answers and streaming
 
 - A SOTA model with reasoning and a large token budget can take a few minutes. LiteLLM waits
-  `sota.timeout` seconds (default 300) for one SOTA call; the other models keep 120 s.
+  `sota.timeout` seconds (default 300) for one SOTA call, and `requestTimeout` seconds (540) for one
+  call to the local model (`components/litellm-router/values.yaml`). A timeout is not retried; errors
+  500, 502, 503, 504 are retried once (`retryPolicy`).
 - Without streaming, no byte flows until the answer is complete, so every hop needs a long idle timeout.
   The `ansible` repo sets 10 minutes on the Route and on the AWS load balancer of the ingress (the AWS
   default is 60 s).
