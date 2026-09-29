@@ -40,6 +40,24 @@ The counters count since the start of the LiteLLM pods (2 replicas, summed). The
 and Tempo through Perses with the token of the console user. The application menu of the console (grid
 icon) also has the section *Sovereign Self-Healing demo* with the same trace links (ansible repo).
 
+## The operations dashboard
+
+*Observe → Dashboards*, project `maas-routing`, dashboard **Sovereign stack - operations** (component
+`litellm-router`, only with `observability.enabled`). It is for the team; the demo view is the dashboard
+above. Two variables choose the router pods and the model pods. It refreshes every 30 seconds and shows:
+
+- **Router pods**: requests per minute by pod and target, tokens per minute by pod and served model,
+  answer time p90 and SOTA -> local fallbacks, by pod.
+- **Local model and GPU**: requests running and waiting in vLLM, tokens per second (generated and prompt),
+  KV cache used; with the `gpu` profile also GPU utilization, memory and power (NVIDIA DCGM exporter).
+- **Gateway**: one gauge per tier of `tiers` (tokens in the last window against the limit; approximate,
+  because Limitador counts in a fixed window that starts with the first call), tokens counted and 429
+  answers per minute by tier, API key checks of Authorino per minute.
+- Links to the other dashboards.
+
+The Kuadrant metrics need the ansible repo: the monitors of Limitador and Authorino and the
+TelemetryPolicy that adds the label `tier`. A new tier in `tiers` gets its gauge without changes here.
+
 ## The trace of one request
 
 ```

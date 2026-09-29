@@ -1,8 +1,16 @@
 # `global` is passed by the bootstrap chart. The defaults below exist only for `helm lint`.
 global:
+  modelProfile: gpu
   namespaces:
     models: local-models
     observability: observability
+  tiers:
+    - name: research
+      tokens: 100000
+      window: 1m
+    - name: legal
+      tokens: 20000
+      window: 5m
   localModel:
     name: example-local
   sota:
@@ -32,6 +40,9 @@ dashboard:
   # Tempo tenant of the router traces: keep it equal to tempo.tenant.name in
   # components/observability and to observability_tempo_tenant in the ansible repo.
   tempoTenant: router
+  # Namespace of Limitador and Authorino (ansible repo, kuadrant_namespace): the dashboard
+  # stack-operations reads their metrics (monitors of the ansible repo).
+  kuadrantNamespace: kuadrant-system
 # Port of the metrics server of the hook (env ROUTER_METRICS_PORT, router v0.5.0+): router
 # metrics and LiteLLM metrics. Not exposed by the gateway.
 metricsPort: 9091

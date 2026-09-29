@@ -1,0 +1,408 @@
+{{- if .Values.global.observability.enabled }}
+{{- $ns := .Release.Namespace }}
+{{- $models := .Values.global.namespaces.models }}
+{{- $kuadrant := .Values.dashboard.kuadrantNamespace }}
+{{- $gpu := eq .Values.global.modelProfile "gpu" }}
+# Perses dashboard for the team (Observe -> Dashboards, project {{ $ns }}): the router per pod,
+# the local model and its GPU, the token budgets of the gateway. The demo view is the dashboard
+# routing-decisions. Same datasource (router-prometheus, Thanos): the queries read the metrics of
+# other namespaces with the token of the console user (cluster-monitoring-view or more).
+# Kuadrant metrics come from the monitors of the ansible repo (label `tier`: TelemetryPolicy).
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: stack-operations
+spec:
+  config:
+    display:
+      name: Sovereign stack - operations
+      description: Router per pod, local model and GPU, token budgets per tier. For the team; the demo view is "Sovereign router - routing decisions".
+    duration: 1h
+    refreshInterval: 30s
+    variables:
+      - kind: ListVariable
+        spec:
+          name: router_pod
+          display: {name: Router pod}
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              datasource: {kind: PrometheusDatasource, name: router-prometheus}
+              labelName: pod
+              matchers:
+                - {{ printf "router_requests_total{namespace=%q}" $ns | quote }}
+      - kind: ListVariable
+        spec:
+          name: model_pod
+          display: {name: Model pod}
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              datasource: {kind: PrometheusDatasource, name: router-prometheus}
+              labelName: pod
+              matchers:
+                - {{ printf "vllm:num_requests_running{namespace=%q}" $models | quote }}
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: {{ printf "Router pods (namespace %s)" $ns | quote }}
+          items:
+            - {x: 0, "y": 0, width: 12, height: 8, content: {$ref: "#/spec/panels/routerRequests"}}
+            - {x: 12, "y": 0, width: 12, height: 8, content: {$ref: "#/spec/panels/routerTokens"}}
+            - {x: 0, "y": 8, width: 12, height: 8, content: {$ref: "#/spec/panels/routerLatency"}}
+            - {x: 12, "y": 8, width: 12, height: 8, content: {$ref: "#/spec/panels/routerFallbacks"}}
+      - kind: Grid
+        spec:
+          display:
+            title: {{ printf "Local model (namespace %s)%s" $models (ternary " and GPU" "" $gpu) | quote }}
+          items:
+            - {x: 0, "y": 0, width: 8, height: 8, content: {$ref: "#/spec/panels/modelRequests"}}
+            - {x: 8, "y": 0, width: 8, height: 8, content: {$ref: "#/spec/panels/modelTokens"}}
+            - {x: 16, "y": 0, width: 8, height: 8, content: {$ref: "#/spec/panels/modelCache"}}
+            {{- if $gpu }}
+            - {x: 0, "y": 8, width: 8, height: 8, content: {$ref: "#/spec/panels/gpuUtil"}}
+            - {x: 8, "y": 8, width: 8, height: 8, content: {$ref: "#/spec/panels/gpuMemory"}}
+            - {x: 16, "y": 8, width: 8, height: 8, content: {$ref: "#/spec/panels/gpuPower"}}
+            {{- end }}
+      - kind: Grid
+        spec:
+          display:
+            title: {{ printf "Gateway: API keys and token budgets (namespace %s)" $kuadrant | quote }}
+          items:
+            {{- $tiers := .Values.global.tiers }}
+            {{- $w := div 24 (max 1 (len $tiers)) }}
+            {{- range $i, $t := $tiers }}
+            - {x: {{ mul $i $w }}, "y": 0, width: {{ $w }}, height: 6, content: {$ref: {{ printf "#/spec/panels/budget_%s" $t.name | quote }}}}
+            {{- end }}
+            - {x: 0, "y": 6, width: 12, height: 8, content: {$ref: "#/spec/panels/tierTokens"}}
+            - {x: 12, "y": 6, width: 6, height: 8, content: {$ref: "#/spec/panels/tierLimited"}}
+            - {x: 18, "y": 6, width: 6, height: 8, content: {$ref: "#/spec/panels/authStatus"}}
+      - kind: Grid
+        spec:
+          display:
+            title: More dashboards
+          items:
+            - {x: 0, "y": 0, width: 24, height: 5, content: {$ref: "#/spec/panels/links"}}
+    panels:
+      routerRequests:
+        kind: Panel
+        spec:
+          display:
+            name: Requests per minute, by pod and target
+            description: Routing decisions of the policy hook on each LiteLLM pod
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              # A table legend shows the numbers without the tooltip (white on white in the console).
+              legend: {position: right, mode: table, size: medium, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 1}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (pod, routed_to) (rate(router_requests_total{namespace=%q,pod=~\"$router_pod\"}[$__rate_interval])) * 60" $ns | quote }}
+                    seriesNameFormat: {{ "{{pod}} -> {{routed_to}}" | quote }}
+      routerTokens:
+        kind: Panel
+        spec:
+          display:
+            name: Tokens per minute, by pod and served model
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: right, mode: table, size: medium, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 0}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (pod, model) (rate(litellm_total_tokens_metric_total{namespace=%q,pod=~\"$router_pod\"}[$__rate_interval])) * 60" $ns | quote }}
+                    seriesNameFormat: {{ "{{pod}} {{model}}" | quote }}
+      routerLatency:
+        kind: Panel
+        spec:
+          display:
+            name: Answer time p90, by pod
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: right, mode: table, size: medium, values: [last-number, max]}
+              yAxis: {format: {unit: seconds}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "histogram_quantile(0.9, sum by (le, pod) (rate(litellm_request_total_latency_metric_bucket{namespace=%q,pod=~\"$router_pod\"}[$__rate_interval])))" $ns | quote }}
+                    seriesNameFormat: {{ "{{pod}}" | quote }}
+      routerFallbacks:
+        kind: Panel
+        spec:
+          display:
+            name: SOTA -> local fallbacks per minute, by pod
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: right, mode: table, size: medium, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 1}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (pod) (rate(litellm_deployment_successful_fallbacks_total{namespace=%q,pod=~\"$router_pod\"}[$__rate_interval])) * 60 or sum by (pod) (router_requests_total{namespace=%q,pod=~\"$router_pod\"}) * 0" $ns $ns | quote }}
+                    seriesNameFormat: {{ "{{pod}}" | quote }}
+      modelRequests:
+        kind: Panel
+        spec:
+          display:
+            name: Requests in the local model
+            description: Running = generating now; waiting = queued by vLLM
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 0}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (pod) (vllm:num_requests_running{namespace=%q,pod=~\"$model_pod\"})" $models | quote }}
+                    seriesNameFormat: {{ "running {{pod}}" | quote }}
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (pod) (vllm:num_requests_waiting{namespace=%q,pod=~\"$model_pod\"})" $models | quote }}
+                    seriesNameFormat: {{ "waiting {{pod}}" | quote }}
+      modelTokens:
+        kind: Panel
+        spec:
+          display:
+            name: Local model tokens per second
+            description: Generated tokens (reasoning included) and prompt tokens
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 0}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (pod) (rate(vllm:generation_tokens_total{namespace=%q,pod=~\"$model_pod\"}[$__rate_interval]))" $models | quote }}
+                    seriesNameFormat: {{ "generated {{pod}}" | quote }}
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (pod) (rate(vllm:prompt_tokens_total{namespace=%q,pod=~\"$model_pod\"}[$__rate_interval]))" $models | quote }}
+                    seriesNameFormat: {{ "prompt {{pod}}" | quote }}
+      modelCache:
+        kind: Panel
+        spec:
+          display:
+            name: KV cache used
+            description: Share of the GPU memory for the KV cache that is in use; near 100% new requests wait
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: percent-decimal, decimalPlaces: 0}, min: 0, max: 1}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "max by (pod) (vllm:kv_cache_usage_perc{namespace=%q,pod=~\"$model_pod\"})" $models | quote }}
+                    seriesNameFormat: {{ "{{pod}}" | quote }}
+      {{- if $gpu }}
+      gpuUtil:
+        kind: Panel
+        spec:
+          display:
+            name: GPU utilization
+            description: NVIDIA DCGM exporter, GPUs used by the pods of the local model
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: percent, decimalPlaces: 0}, min: 0, max: 100}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "max by (exported_pod, gpu) (DCGM_FI_DEV_GPU_UTIL{exported_namespace=%q,exported_pod=~\"$model_pod\"})" $models | quote }}
+                    seriesNameFormat: {{ "GPU {{gpu}} {{exported_pod}}" | quote }}
+      gpuMemory:
+        kind: Panel
+        spec:
+          display:
+            name: GPU memory used
+            description: vLLM reserves most of the GPU memory at start (model and KV cache), so this stays high
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: percent, decimalPlaces: 0}, min: 0, max: 100}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "100 * max by (exported_pod, gpu) (DCGM_FI_DEV_FB_USED{exported_namespace=%q,exported_pod=~\"$model_pod\"}) / max by (exported_pod, gpu) (DCGM_FI_DEV_FB_USED{exported_namespace=%q,exported_pod=~\"$model_pod\"} + DCGM_FI_DEV_FB_FREE{exported_namespace=%q,exported_pod=~\"$model_pod\"})" $models $models $models | quote }}
+                    seriesNameFormat: {{ "GPU {{gpu}} {{exported_pod}}" | quote }}
+      gpuPower:
+        kind: Panel
+        spec:
+          display:
+            name: GPU power
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 0}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "max by (exported_pod, gpu) (DCGM_FI_DEV_POWER_USAGE{exported_namespace=%q,exported_pod=~\"$model_pod\"})" $models | quote }}
+                    seriesNameFormat: {{ "W, GPU {{gpu}} {{exported_pod}}" | quote }}
+      {{- end }}
+      {{- range $t := .Values.global.tiers }}
+      budget_{{ $t.name }}:
+        kind: Panel
+        spec:
+          display:
+            name: {{ printf "Tier %s: tokens in the last %s (limit %v)" $t.name $t.window $t.tokens | quote }}
+            description: Approximate. Limitador counts in a fixed window that starts with the first call; this gauge sums the last window up to now.
+          plugin:
+            kind: GaugeChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              max: {{ $t.tokens }}
+              thresholds:
+                steps:
+                  - {value: {{ div (mul $t.tokens 7) 10 }}, color: "#f0ab00"}
+                  - {value: {{ div (mul $t.tokens 9) 10 }}, color: "#c9190b"}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(increase(authorized_hits{namespace=%q,tier=%q}[%s])) or vector(0)" $kuadrant $t.name $t.window | quote }}
+                    seriesNameFormat: {{ printf "%s tokens" $t.name | quote }}
+      {{- end }}
+      tierTokens:
+        kind: Panel
+        spec:
+          display:
+            name: Tokens counted per minute, by tier
+            description: Tokens of the answers that Limitador added to the budget of each API-key tier
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: right, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 0}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (tier) (rate(authorized_hits{namespace=%q,tier!=\"\"}[$__rate_interval])) * 60" $kuadrant | quote }}
+                    seriesNameFormat: {{ "{{tier}}" | quote }}
+      tierLimited:
+        kind: Panel
+        spec:
+          display:
+            name: Refused (429) per minute, by tier
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 1}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (tier) (rate(limited_calls{namespace=%q,tier!=\"\"}[$__rate_interval])) * 60 or sum by (tier) (authorized_calls{namespace=%q,tier!=\"\"}) * 0" $kuadrant $kuadrant | quote }}
+                    seriesNameFormat: {{ "{{tier}}" | quote }}
+      authStatus:
+        kind: Panel
+        spec:
+          display:
+            name: API key checks per minute
+            description: Answers of Authorino; UNAUTHENTICATED = no key or a wrong key
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 1}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (status) (rate(auth_server_response_status{namespace=%q}[$__rate_interval])) * 60" $kuadrant | quote }}
+                    seriesNameFormat: {{ "{{status}}" | quote }}
+      links:
+        kind: Panel
+        spec:
+          display:
+            name: Other dashboards
+          plugin:
+            kind: Markdown
+            spec:
+              text: |
+                - [Sovereign router - routing decisions](/monitoring/v2/dashboards/view?dashboard=routing-decisions&project={{ $ns }}): the demo view.
+                - CPU, memory and network of a namespace or a pod: *Observe -> Dashboards*, "Kubernetes / Compute Resources / Namespace (Pods)" and "/ Pod".
+                - vLLM and model serving (OpenShift AI): *Observe -> Dashboards*, the "model-serving-llms" dashboards.
+                {{- if $gpu }}
+                - [Accelerators (all GPUs of the cluster)](/monitoring/v2/dashboards/view?dashboard=accelerators-dashboard&project=openshift-cluster-observability-operator)
+                {{- end }}
+{{- end }}
