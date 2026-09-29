@@ -17,7 +17,16 @@ global:
     extraArgs: []
     env: []
     gpu: 0
-    resources: {}
+    resources:
+      requests:
+        cpu: "1"
+        memory: 1Gi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    hardwareProfile:
+      displayName: Example profile
+      description: Example description
 
 # Size of /dev/shm for vLLM (shared memory between processes).
 shmSizeLimit: 2Gi
