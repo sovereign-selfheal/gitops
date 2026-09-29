@@ -85,15 +85,18 @@ classifier:
 # when the answer ends; a call is refused (429) when it arrives with the budget used up.
 # The counter is per tier: everyone with the same key shares it.
 #   research: normal use, never blocks during a demo
-#   legal:    strict tier, shows the 429 after a few long answers; the window is long so
-#             that answers sent one after the other add up
+#   legal:    strict tier, shows the 429 after a few long answers. The legal tier only uses
+#             the local model, which reasons: one answer is 1.5-4k tokens, mostly reasoning.
+#             20k tokens is about 5 long answers or 10 agent calls of 2k; answers sent one
+#             after the other (about 50 s each) add up in the window, and after a 429 the
+#             tier opens again within 5 minutes (a demo scene can be repeated soon).
 tiers:
   - name: research
     tokens: 100000
     window: 1m
   - name: legal
-    tokens: 5000
-    window: 10m
+    tokens: 20000
+    window: 5m
 
 # ----- Local model profiles --------------------------------------------------------
 # Images are pinned by digest, resolved on the date in the comment.
