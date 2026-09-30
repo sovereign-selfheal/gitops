@@ -4,11 +4,12 @@
 {{- end }}
 
 {{/*
-GPU scheduling, used by the InferenceService and by the hardware profile. Both labels are generic:
-the GPU operator sets nvidia.com/gpu.present on every NVIDIA node, whatever the GPU model.
+GPU scheduling, used by the InferenceService and by the hardware profile. Default: the generic
+label nvidia.com/gpu.present, set by the GPU operator on every NVIDIA node. With the decision model
+the seed adds the node label of the Qwen pool (localModel.profiles.gpu.nodeSelector).
 */}}
 {{- define "local-model.gpuNodeSelector" -}}
-nvidia.com/gpu.present: "true"
+{{- toYaml (.Values.global.localModel.nodeSelector | default (dict "nvidia.com/gpu.present" "true")) }}
 {{- end }}
 
 {{/* GPU nodes carry this taint (roles/gpu_node_prep in the ansible repo). */}}

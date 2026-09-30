@@ -1,0 +1,50 @@
+{{- /*
+The predictor NetworkPolicies of components/local-model already select every predictor of the
+namespace on :8080 (the decision server): the router reaches it there. This one adds vLLM
+:8000 (/metrics) for user workload monitoring, and optional extra namespaces on :8080 (for
+example the self-heal agents).
+*/ -}}
+{{- $m := .Values.global.decisionModel }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $m.name }}-metrics
+spec:
+  podSelector:
+    matchLabels:
+      component: predictor
+      serving.kserve.io/inferenceservice: {{ $m.name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: monitoring
+      ports:
+        - protocol: TCP
+          port: 8000
+{{- with $m.extraIngressNamespaces }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $m.name }}-from-clients
+spec:
+  podSelector:
+    matchLabels:
+      component: predictor
+      serving.kserve.io/inferenceservice: {{ $m.name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        {{- range . }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8080
+{{- end }}

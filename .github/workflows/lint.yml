@@ -58,3 +58,10 @@ jobs:
           uv run --no-project --with "pyyaml==${PYYAML_VERSION}" scripts/render.sh gpu rendered/minimal \
             --set observability.enabled=false --set sota.enabled=false --set classifier.mode=local
           kubeconform -summary -ignore-missing-schemas rendered/minimal/*.yaml
+
+      - name: Render and validate (decision model, as the seed sets it)
+        run: |
+          uv run --no-project --with "pyyaml==${PYYAML_VERSION}" scripts/render.sh gpu rendered/decision \
+            --set decisionModel.enabled=true \
+            --set-json 'localModel.profiles.gpu.nodeSelector={"node-role.kubernetes.io/gpu": ""}'
+          kubeconform -summary -ignore-missing-schemas rendered/decision/*.yaml

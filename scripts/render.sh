@@ -5,6 +5,7 @@
 # Usage: scripts/render.sh [gpu|cpu] [output dir] [helm options for the bootstrap chart]
 #   HELM=/path/to/helm3 scripts/render.sh cpu
 #   scripts/render.sh gpu rendered/off --set observability.enabled=false --set sota.enabled=false
+#   scripts/render.sh gpu rendered/decision --set decisionModel.enabled=true
 # Writes <out>/bootstrap.yaml, <out>/<component>.yaml and the values passed to each
 # component in <out>/values/, then checks that
 #   - components render no Namespace and no Secret objects;

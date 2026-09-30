@@ -1,0 +1,47 @@
+{{- /*
+RHOAI hardware profile of the decision model, in the model namespace (project scope). Same shape
+as the one of components/local-model: the odh-model-controller webhook copies the profile
+scheduling into the InferenceService. The node label selects the gpu-decision pool of the ansible
+repo, so the decision model never lands on the Qwen node and the other way round.
+No nvidia.com/gpu identifier: the webhook adds the missing identifiers to the resources of
+kserve-container, here the decision server. The GPU belongs to the vllm container of the
+ServingRuntime; with the identifier the pod would ask for two GPUs (checked on 2026-09-30).
+The CPU and memory identifiers describe the vllm container, the one that needs them.
+*/ -}}
+{{- $m := .Values.global.decisionModel }}
+{{- $req := required "decisionModel.resources.requests is required" $m.resources.requests }}
+{{- $lim := required "decisionModel.resources.limits is required" $m.resources.limits }}
+apiVersion: infrastructure.opendatahub.io/v1
+kind: HardwareProfile
+metadata:
+  name: {{ include "decision-model.hardwareProfileName" . }}
+  labels:
+    app.opendatahub.io/hardwareprofile: "true"
+  annotations:
+    # Before the InferenceService, which names this profile.
+    argocd.argoproj.io/sync-wave: "-1"
+    opendatahub.io/display-name: {{ $m.hardwareProfile.displayName | quote }}
+    opendatahub.io/description: {{ $m.hardwareProfile.description | quote }}
+    opendatahub.io/disabled: "false"
+    opendatahub.io/dashboard-feature-visibility: '[]'
+spec:
+  identifiers:
+    - identifier: cpu
+      displayName: CPU
+      resourceType: CPU
+      minCount: {{ $req.cpu | quote }}
+      defaultCount: {{ $req.cpu | quote }}
+      maxCount: {{ $lim.cpu | quote }}
+    - identifier: memory
+      displayName: Memory
+      resourceType: Memory
+      minCount: {{ $req.memory | quote }}
+      defaultCount: {{ $req.memory | quote }}
+      maxCount: {{ $lim.memory | quote }}
+  scheduling:
+    type: Node
+    node:
+      nodeSelector:
+        {{- toYaml $m.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- include "decision-model.gpuTolerations" . | nindent 8 }}
