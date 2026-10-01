@@ -4,8 +4,8 @@ global: {}
 
 # Image of the quarkus-buggy-app repo (github.com/sovereign-selfheal/quarkus-buggy-app):
 # Quarkus 3 REST service, built with the Jib extension (no Dockerfile).
-# tag TBD, resolved on quay.io on TBD
-image: quay.io/sovereign-selfheal/quarkus-buggy-app@sha256:0000000000000000000000000000000000000000000000000000000000000
+# tag v0.1.2, resolved on quay.io on 2026-10-01
+image: quay.io/sovereign-selfheal/quarkus-buggy-app@sha256:c05e9dacf67d3dd5a5ea8b6a21c9a4fb928c907a6f6f8e9f3e4452bd49842458
 replicas: 1
 resources:
   requests:

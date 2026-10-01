@@ -3,8 +3,8 @@
 global: {}
 
 # Image of the prometheus-mcp-server repo (github.com/sovereign-selfheal/prometheus-mcp-server).
-# tag TBD, resolved on quay.io on TBD
-image: quay.io/sovereign-selfheal/prometheus-mcp-server@sha256:0000000000000000000000000000000000000000000000000000000000000
+# tag 9bb3f38, resolved on quay.io on 2026-10-01
+image: quay.io/sovereign-selfheal/prometheus-mcp-server@sha256:23a583a4384c3bd3da82646ebeaec286a79dfb908aa7a68ee45e3ab64a8730d1
 replicas: 1
 resources:
   requests:

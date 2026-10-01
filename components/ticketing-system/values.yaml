@@ -2,10 +2,10 @@
 # `helm lint` works (no key of `global` is read by this component).
 global: {}
 
-# Image of the mock-ticketing-system repo (github.com/sovereign-selfheal/mock-ticketing-system),
-# subfolder ticketing-system: FastAPI ServiceNow simulator.
-# tag TBD, resolved on quay.io on TBD
-image: quay.io/sovereign-selfheal/ticketing-system@sha256:0000000000000000000000000000000000000000000000000000000000000
+# Image of the mock-ticketing-system repo (github.com/sovereign-selfheal/mock-ticketing-system):
+# FastAPI ServiceNow simulator.
+# tag 7352037, resolved on quay.io on 2026-10-01
+image: quay.io/sovereign-selfheal/mock-ticketing-system@sha256:7a6ae64c909d43a2c09b1973ecf25dae281d9a674b3ac536b72f3c81b72690cb
 # SQLite on a PVC: keep this at 1, there is no locking between replicas.
 replicas: 1
 resources:
