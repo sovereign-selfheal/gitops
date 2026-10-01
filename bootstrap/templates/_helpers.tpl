@@ -20,4 +20,6 @@ tiers:
   {{- toYaml .Values.tiers | nindent 2 }}
 localModel:
   {{- toYaml $profile | nindent 2 }}
+decisionModel:
+  {{- toYaml .Values.decisionModel | nindent 2 }}
 {{- end }}

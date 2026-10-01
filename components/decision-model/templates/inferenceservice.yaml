@@ -1,0 +1,33 @@
+{{- $m := .Values.global.decisionModel }}
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: {{ $m.name }}
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    serving.kserve.io/deploymentMode: Standard
+    openshift.io/display-name: {{ $m.displayName }}
+    # Links the model to its hardware profile (templates/hardwareprofile.yaml).
+    opendatahub.io/hardware-profile-name: {{ include "decision-model.hardwareProfileName" . }}
+    opendatahub.io/hardware-profile-namespace: {{ .Release.Namespace }}
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 1
+    # Recreate: one GPU per model, a rolling update would deadlock (see components/local-model).
+    deploymentStrategy:
+      type: Recreate
+    nodeSelector:
+      {{- toYaml $m.nodeSelector | nindent 6 }}
+    tolerations:
+      {{- include "decision-model.gpuTolerations" . | nindent 6 }}
+    model:
+      runtime: {{ $m.runtime }}
+      modelFormat:
+        name: vLLM
+      storageUri: {{ $m.storageUri }}
+      # The decision server (kserve-container). The GPU, CPU and memory of vLLM are in the
+      # ServingRuntime, on the vllm container.
+      resources:
+        {{- toYaml $m.server.resources | nindent 8 }}

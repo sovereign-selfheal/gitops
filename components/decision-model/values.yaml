@@ -1,0 +1,37 @@
+# `global` is passed by the bootstrap chart (see bootstrap/templates/_helpers.tpl).
+# The defaults below exist only for `helm lint`; real values come from bootstrap.
+global:
+  appsDomain: apps.example.com
+  namespaces:
+    models: local-models
+    router: maas-routing
+  decisionModel:
+    enabled: true
+    name: example-decision
+    displayName: Example decision model
+    servedModelName: example
+    runtime: example-structured-read-runtime
+    runtimeDisplayName: Example runtime
+    runtimeImage: registry.example.com/vllm@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    runtimeVersion: v0.0.0
+    storageUri: oci://registry.example.com/model@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    canvasLength: 64
+    extraArgs: []
+    env: []
+    gpu: 1
+    nodeSelector:
+      node-role.kubernetes.io/gpu-decision: ""
+    resources:
+      requests: {cpu: "1", memory: 1Gi}
+      limits: {cpu: "1", memory: 1Gi}
+    server:
+      resources:
+        requests: {cpu: 100m, memory: 256Mi}
+        limits: {cpu: "1", memory: 1Gi}
+    extraIngressNamespaces: []
+    hardwareProfile:
+      displayName: Example profile
+      description: Example description
+
+# Size of /dev/shm for vLLM (shared memory between processes).
+shmSizeLimit: 2Gi

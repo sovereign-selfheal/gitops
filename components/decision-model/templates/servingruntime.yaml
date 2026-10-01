@@ -1,0 +1,114 @@
+{{- /*
+Two containers in one pod:
+- kserve-container: the example decision server of vLLM on :8080 (/health, /v1/systemone,
+  /v1/chat/completions, /v1/raw/chat/completions). The predictor Service and the NetworkPolicies
+  of components/local-model reach it on this port.
+- vllm: `vllm serve` with the structured-read mode on :8000, also the /metrics endpoint.
+The decision server answers /health with a fixed 200 even when vLLM is not up (checked on
+2026-09-30), so its readiness probe asks vLLM.
+*/ -}}
+{{- $m := .Values.global.decisionModel }}
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: {{ $m.runtime }}
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/runtime-version: {{ $m.runtimeVersion }}
+    openshift.io/display-name: {{ $m.runtimeDisplayName }}
+    opendatahub.io/recommended-accelerators: '["nvidia.com/gpu"]'
+spec:
+  annotations:
+    opendatahub.io/kserve-runtime: vllm
+    prometheus.io/path: /metrics
+    prometheus.io/port: "8000"
+  containers:
+    - name: kserve-container
+      image: {{ $m.runtimeImage }}
+      command:
+        - python3
+        - /opt/decision-server/structured_server.py
+      args:
+        - --upstream=http://127.0.0.1:8000
+        - --model={{ $m.servedModelName }}
+        - --tokenizer=/mnt/models
+        - --canvas={{ int $m.canvasLength }}
+        - --port=8080
+      env:
+        - name: HOME
+          value: /tmp
+        - name: HF_HOME
+          value: /tmp/hf_home
+      ports:
+        - containerPort: 8080
+          protocol: TCP
+      readinessProbe:
+        exec:
+          command:
+            - python3
+            - -c
+            - import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=3)
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+      volumeMounts:
+        - name: decision-server
+          mountPath: /opt/decision-server
+          readOnly: true
+    - name: vllm
+      image: {{ $m.runtimeImage }}
+      # KServe mounts the modelcar (/mnt/models) only in kserve-container, here the decision
+      # server; the Deployment cannot name its volume (KServe adds it to the pod later, checked
+      # on 2026-09-30). The pod shares one process namespace and all containers run with the
+      # same UID, so vLLM reads the model files where /mnt/models points: the root of the
+      # modelcar process, /proc/<pid>/root/models.
+      command:
+        - /bin/sh
+        - -c
+        - >-
+          until m=$(ls -d /proc/[0-9]*/root/models 2>/dev/null | head -n 1) && [ -n "$m" ];
+          do echo "waiting for the modelcar"; sleep 2; done;
+          echo "model files: $m"; exec vllm serve "$m" "$@"
+        - vllm
+      args:
+        - --served-model-name={{ $m.servedModelName }}
+        - {{ printf "--diffusion-config={\"canvas_length\": %d}" (int $m.canvasLength) | quote }}
+        - --host=0.0.0.0
+        - --port=8000
+        # extraArgs are quoted: some carry JSON, and ": " would break a plain YAML scalar.
+        {{- range $m.extraArgs }}
+        - {{ . | quote }}
+        {{- end }}
+      env:
+        - name: HF_HOME
+          value: /tmp/hf_home
+        {{- with $m.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      ports:
+        - containerPort: 8000
+          name: metrics
+          protocol: TCP
+      resources:
+        requests:
+          {{- toYaml $m.resources.requests | nindent 10 }}
+          nvidia.com/gpu: {{ $m.gpu | quote }}
+        limits:
+          {{- toYaml $m.resources.limits | nindent 10 }}
+          nvidia.com/gpu: {{ $m.gpu | quote }}
+      volumeMounts:
+        - name: shm
+          mountPath: /dev/shm
+  volumes:
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: {{ .Values.shmSizeLimit }}
+    - name: decision-server
+      configMap:
+        name: {{ $m.name }}-server
+  multiModel: false
+  supportedModelFormats:
+    - name: vLLM
+      autoSelect: false

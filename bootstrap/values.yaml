@@ -137,6 +137,12 @@ localModel:
         - '--speculative-config={"method": "mtp", "num_speculative_tokens": 3}'
       env: []
       gpu: 1
+      # Nodes of the model (HardwareProfile and InferenceService). nvidia.com/gpu.present is on
+      # every NVIDIA node. With the decision model there is a second GPU node, so the seed adds
+      # node-role.kubernetes.io/gpu (the label of the Qwen pool of the ansible repo); Helm
+      # merges the two maps.
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
       # g7e.2xlarge: 8 vCPU, 64 GiB.
       resources:
         requests:
@@ -176,6 +182,72 @@ localModel:
         displayName: CPU only (vLLM CPU)
         description: CPU and memory only, no GPU.
 
+# ----- Decision model (component decision-model) ----------------------------------
+# DiffusionGemma 26B-A4B FP8-dynamic served by the vLLM structured-read mode, behind the example
+# decision server of vLLM (/v1/systemone: typed questions, one probability per answer from one
+# forward pass). It runs on its own GPU node (gpu-decision pool of the ansible repo, one NVIDIA
+# L40S on a g6e.2xlarge). Qwen3.8 is not changed.
+# SUPPORT STATUS: unsupported preview image, for prototypes and proofs of concept. The example
+# decision server is planned as Developer Preview in Red Hat AI Inference Server 3.6 GA and as
+# Technology Preview in 3.7 EA1 (3.7 GA: path to general availability). Its API may change.
+decisionModel:
+  # Set by the seed (decision_model_enabled of the ansible repo).
+  enabled: false
+  # The name must not contain the SOTA match token of chain.yaml ("qwen38-27b").
+  name: dgemma-decision
+  displayName: DiffusionGemma 26B-A4B FP8 (decision model, vLLM structured-read)
+  # Model name for vLLM and the decision server (label model_name of the vLLM metrics).
+  servedModelName: dgemma
+  runtime: vllm-structured-read-runtime
+  runtimeDisplayName: vLLM structured-read (preview) with the example decision server
+  # rhaii-preview/vllm-cuda-rhel9:diffusiongemma-jev (linux/amd64), resolved on registry.redhat.io
+  # on 2026-09-30. vLLM 0.29.1.dev1248+rhaiv.2.rubin, CUDA 13.0. Unsupported preview.
+  runtimeImage: registry.redhat.io/rhaii-preview/vllm-cuda-rhel9@sha256:24fccf947aa33857611efed0d57aead4efc525c78a882760db5229b702713a1a
+  runtimeVersion: v0.29.1.dev1248
+  # RedHatAI/diffusiongemma-26B-A4B-it-FP8-dynamic (27.2 GB), built by the modelcar repo.
+  # tag diffusiongemma-26b-a4b-fp8-3b3dae4, resolved on quay.io on 2026-09-30
+  storageUri: oci://quay.io/sovereign-selfheal/modelcar-diffusiongemma-26b-a4b-fp8@sha256:b10821319f60a03ec78e6aacf57bedca83e540fd8b0cbcbf3ffc644215e81fc6
+  # Answer canvas of the structured-read mode, in tokens. vLLM and the decision server must agree.
+  canvasLength: 64
+  # Flags of the Red Hat quick start (validated with this checkpoint on 2026-09-25, and on an
+  # L40S on 2026-09-30). No flag of the model card was needed.
+  extraArgs:
+    - --max-logprobs=32
+    - --enable-prefix-caching
+    - --max-num-seqs=4
+    - --gpu-memory-utilization=0.85
+    - --enforce-eager
+  env:
+    - name: PYTORCH_CUDA_ALLOC_CONF
+      value: expandable_segments:True
+  gpu: 1
+  nodeSelector:
+    node-role.kubernetes.io/gpu-decision: ""
+  # vLLM container. g6e.2xlarge: 8 vCPU, 64 GiB (57.8 GiB allocatable). After the load vLLM used
+  # 31.2 GiB of host memory (2026-09-30).
+  resources:
+    requests:
+      cpu: "4"
+      memory: 36Gi
+    limits:
+      cpu: "6"
+      memory: 48Gi
+  # Decision server (kserve-container): 1.7 GiB after start (it loads the tokenizer).
+  server:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: "1"
+        memory: 4Gi
+  # Namespaces that may call the decision server on :8080, besides the router (for example the
+  # namespace of the self-heal agents).
+  extraIngressNamespaces: []
+  hardwareProfile:
+    displayName: NVIDIA L40S (g6e.2xlarge)
+    description: One NVIDIA L40S GPU (48 GB) on an AWS g6e.2xlarge node, for the decision model.
+
 # ----- Components (one Argo CD Application each) --------------------------------
 # wave: Argo CD sync wave of the Application; namespaceRef: key in `namespaces` above.
 components:
@@ -189,6 +261,10 @@ components:
     namespaceRef: router
   local-model:
     enabled: true
+    wave: 1
+    namespaceRef: models
+  decision-model:
+    enabled: true      # also needs decisionModel.enabled
     wave: 1
     namespaceRef: models
   presidio:

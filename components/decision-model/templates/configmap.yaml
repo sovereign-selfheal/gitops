@@ -1,0 +1,12 @@
+{{- /*
+The example decision server of vLLM (examples/features/structured_diffusion/structured_server.py,
+upstream commit 1b3b88e of 2026-09-22, Apache-2.0, unchanged). The preview image ships vLLM with
+the structured-read mode but not this script (checked on 2026-09-30).
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.global.decisionModel.name }}-server
+data:
+  structured_server.py: |
+{{ .Files.Get "files/structured_server.py" | indent 4 }}

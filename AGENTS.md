@@ -24,7 +24,13 @@ here. After that, Argo CD owns every object described in this repo.
 - **Values set by the seed** (root Application, `helm.valuesObject`): `appsDomain`, `modelProfile`
   (`gpu` or `cpu`), `sota.enabled`, `sota.apiBase`, `sota.model`, `sota.servedMatch`, `sota.reasoning`, `secretStore.enabled`,
   `classifier.mode` (`local`, `external` or `off`), `observability.enabled`, `namespaces.observability`,
-  and optionally `tiers`. Defaults are in `bootstrap/values.yaml`.
+  `decisionModel.enabled`, and optionally `tiers`. With the decision model and managed GPU nodes the seed
+  also sets `localModel.profiles.gpu.nodeSelector` to `node-role.kubernetes.io/gpu: ""` (Helm merges it
+  with the default `nvidia.com/gpu.present`). Defaults are in `bootstrap/values.yaml`.
+- **Decision model** (`decisionModel.enabled`, only with `modelProfile: gpu`): the component `decision-model`
+  runs on the `gpu-decision` GPU pool of the ansible repo (node label `node-role.kubernetes.io/gpu-decision`).
+  When you change `decisionModel.storageUri` or `.runtimeImage`, update `model_prepull_decision_images` in
+  the ansible repo with the same digests.
 - **Observability**: this repo deploys the Tempo instance `tempo` (kind `TempoMonolithic`, multi-tenancy
   `openshift`, tenant `router`) and the OpenTelemetry collector `otel` (kind `OpenTelemetryCollector`; the
   operator names its Service and ServiceAccount `otel-collector`) in the namespace `observability`. OTLP

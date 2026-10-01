@@ -14,6 +14,7 @@ client ──> Route maas-router (ansible) ──> Gateway openshift-ai-inferenc
            └──> LiteLLM (component litellm-router): efficiency gate, then privacy gate
                   ├── Presidio analyzer (component presidio): PII detection, EN + IT
                   ├── local model (component local-model): Qwen3.8 27B on GPU, or Qwen2.5 0.5B on CPU
+                  ├── decision model (component decision-model, optional): DiffusionGemma on its own GPU
                   ├── external SOTA model (OpenAI compatible), fallback to the local model
                   ├ ─ traces (OTLP) ─> collector otel ─> Tempo (component observability)
                   └ ─ metrics :9091 <─ user workload Prometheus (ServiceMonitor litellm)
@@ -28,6 +29,7 @@ Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/obser
 | `observability` | `observability` | 0 | `TempoMonolithic` `tempo` (traces on a 10Gi volume, 72h, multi-tenancy `openshift`, tenant `router`), `OpenTelemetryCollector` `otel` (OTLP in, Tempo gateway out). Only with `observability.enabled` |
 | `secrets` | `maas-routing` | 0 | ESO `Password` generator, ExternalSecrets for the API keys, SOTA key, classifier |
 | `local-model` | `local-models` | 1 | ServingRuntime (copy of the RHOAI template), InferenceService, HardwareProfile (shown in the RHOAI dashboard), NetworkPolicies |
+| `decision-model` | `local-models` | 1 | Only with `decisionModel.enabled`: ServingRuntime (vLLM structured-read and the example decision server), InferenceService `dgemma-decision`, HardwareProfile, ConfigMap (decision server script), NetworkPolicies. See "Decision model" |
 | `presidio` | `maas-routing` | 1 | Deployment (2 replicas), PodDisruptionBudget, Service, NetworkPolicy (no egress) |
 | `litellm-router` | `maas-routing` | 2 | ConfigMap (config + hook code + policies), Deployment (2 replicas), PodDisruptionBudget, Service (API port 80, metrics 9091), ServiceMonitor, NetworkPolicy (4000 from the gateway, 9091 from monitoring), Perses dashboards `sovereign-at-a-glance` (audience), `routing-decisions` (demo) and `stack-operations` (team) and their datasources (only with `observability.enabled`) |
 | `frontdoor` | `maas-routing` | 3 | HTTPRoute, AuthPolicy (API key; refuses `/metrics`), TokenRateLimitPolicy |
@@ -56,6 +58,7 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 | `secretStore.enabled` | `false` | `true` when the ClusterSecretStore exists (see below) |
 | `classifier.mode` | `local` | C2 classifier of the privacy gate: `local` (the local model), `external`, `off` (see below) |
 | `observability.enabled` | `true` | `false`: no Tempo, no collector, no traces (see "Observability") |
+| `decisionModel.enabled` | `false` | `true`: the decision model on its own GPU node (see "Decision model"); needs `modelProfile: gpu` |
 
 ## Observability
 
@@ -109,12 +112,59 @@ extra opinion. `classifier.mode` selects that LLM:
 
 | Mode | Classifier | Notes |
 |---|---|---|
-| `local` (default) | The local model (Qwen3.8 27B on GPU) | The prompt never leaves the cluster, also while it is classified. No secret needed |
+| `local` (default) | The local model (Qwen3.8 27B on GPU); with `decisionModel.enabled`, the decision model first (`systemone` backend, router v0.7.0), then Qwen3.8 as fallback | The prompt never leaves the cluster, also while it is classified. No secret needed |
 | `external` | An external model | Settings from the secret store (`classifier-provider-secret`) |
 | `off` | None | The rules alone decide |
 
 The classifier can only make a prompt more sensitive, never less. On an error or a timeout (8 s), the
-prompt is treated as sensitive and stays on the local model.
+prompt is treated as sensitive and stays on the local model. With the decision model, an error or a timeout of the decision server
+first falls back to Qwen3.8; only when that fails too, the prompt stays local. The log reason names the
+backend that decided: `systemone/llm@0.93` or `fallback/llm@0.90`.
+
+## Decision model
+
+With `decisionModel.enabled` the demo gets a second local model, with one job: typed decisions.
+DiffusionGemma 26B-A4B FP8-dynamic runs in the vLLM structured-read mode, behind the example decision
+server of vLLM. The server fills a fixed answer canvas, runs one denoising step and reads the
+probability of each answer, so the reply is a real probability with no free text to parse. Qwen3.8
+and its node do not change.
+
+> **Support status:** the decision model runs on an **unsupported preview image**
+> (`registry.redhat.io/rhaii-preview/vllm-cuda-rhel9:diffusiongemma-jev`), for prototypes and proofs of
+> concept. The example decision server is planned as Developer Preview in Red Hat AI Inference Server
+> 3.6 GA and as Technology Preview in 3.7 EA1; 3.7 GA is the path to general availability. Its API is not
+> a vLLM API and may change. LiteLLM and Presidio are community software, not supported by Red Hat.
+
+The predictor pod has two containers:
+
+| Container | Port | What |
+|---|---|---|
+| `kserve-container` | 8080 | The example decision server (`files/structured_server.py`, vLLM commit 1b3b88e, not in the image): `/health`, `/v1/systemone`, `/v1/chat/completions`, `/v1/raw/chat/completions` |
+| `vllm` | 8000 | `vllm serve` with the structured-read mode, one GPU, `/metrics` |
+
+The decision server answers `/health` with 200 even when vLLM is not up, so the readiness probe of the
+pod asks vLLM (`127.0.0.1:8000/health`). The HardwareProfile has no GPU identifier: the RHOAI webhook
+would add the GPU to `kserve-container` as well, and the pod would ask for two GPUs.
+
+Clients call `http://dgemma-decision-predictor.local-models.svc.cluster.local/v1/systemone`. The
+router namespace can reach it; add other namespaces (for example the self-heal agents) with
+`decisionModel.extraIngressNamespaces`. Example:
+
+```bash
+curl -s http://dgemma-decision-predictor.local-models.svc.cluster.local/v1/systemone \
+  -H 'content-type: application/json' -d '{
+  "model": "dgemma",
+  "state": {"service": "checkout-api", "symptom": "HTTP 503 rate rose from 0.1% to 23% after a deploy"},
+  "questions": {
+    "urgent": {"type": "noul", "instructions": "Does this need response within 15 minutes?"},
+    "needs_human": {"type": "noul", "instructions": "Should human review before automated action?"}}}'
+# {"model": "dgemma", "answers": {"urgent": {"type": "noul", "noul": 0.99}, "needs_human": {...}}, "usage": ..., "diagnostics": ...}
+```
+
+Measured on 2026-09-30 on one L40S (g6e.2xlarge): vLLM ready 5 min 11 s after the pod start (weights
+207 s), a call with three yes/no questions about 350 ms for a short prompt (134 ms with `"samples": 1`),
+about 570 ms for 3,800 tokens and 5.8 s for 40,000 tokens. The first call after the start takes about
+30 s (warm-up).
 
 ## Local-only mode
 
