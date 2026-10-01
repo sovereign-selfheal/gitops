@@ -53,8 +53,9 @@ here. After that, Argo CD owns every object described in this repo.
 - **Secrets**: never in git. The External Secrets Operator creates them, either from the external store
   or from an in-cluster generator (see README "Secrets").
 - **Argo CD health checks**: Ansible configures the ArgoCD CR so that Argo CD reports the health of
-  `Application` (needed for sync waves between components), `InferenceService`, the Kuadrant policies and
-  `TempoMonolithic`. Argo CD 3.4 knows `OpenTelemetryCollector` by itself.
+  `Application` (needed for sync waves between components), `InferenceService`, the Kuadrant policies,
+  `TempoMonolithic` and MCP lifecycle `MCPServer` (`mcp.x-k8s.io`). Argo CD 3.4 knows
+  `OpenTelemetryCollector` by itself.
 
 ## 3. Contract with the `router` and `presidio` repos
 
