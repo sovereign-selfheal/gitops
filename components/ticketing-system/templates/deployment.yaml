@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticketing-system
+  labels:
+    app: ticketing-system
+spec:
+  # SQLite is a single writer: never raise this without moving to a real database.
+  replicas: {{ .Values.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ticketing-system
+  template:
+    metadata:
+      labels:
+        app: ticketing-system
+    spec:
+      containers:
+        - name: ticketing-system
+          image: {{ .Values.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: TICKETING_DB_PATH
+              value: /data/incidents.db
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ticketing-system
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ticketing-system
+  labels:
+    app: ticketing-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticketing-system
+  labels:
+    app: ticketing-system
+spec:
+  selector:
+    app: ticketing-system
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# Dashboard (HTML at "/") for the demo script: a human opens this to see incidents that
+# the agents created or updated.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ticketing-system
+  labels:
+    app: ticketing-system
+spec:
+  to:
+    kind: Service
+    name: ticketing-system
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

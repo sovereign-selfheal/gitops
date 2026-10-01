@@ -1,0 +1,7 @@
+apiVersion: v2
+name: ticketing-system
+description: >-
+  ServiceNow Table API simulator (incidents), backed by SQLite. Used by the triage-agent
+  demo and by humans reporting an issue manually.
+type: application
+version: 0.1.0

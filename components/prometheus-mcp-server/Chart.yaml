@@ -1,0 +1,7 @@
+apiVersion: v2
+name: prometheus-mcp-server
+description: >-
+  MCP server that exposes PromQL queries (instant and range) against Thanos Querier as
+  MCP tools.
+type: application
+version: 0.1.0

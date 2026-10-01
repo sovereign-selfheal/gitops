@@ -1,0 +1,7 @@
+apiVersion: v2
+name: quarkus-buggy-app
+description: >-
+  Quarkus REST service with intentional, randomly-triggered failures (500s, slow 200s,
+  503s), used as the target of the triage-agent demo.
+type: application
+version: 0.1.0

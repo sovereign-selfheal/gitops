@@ -1,0 +1,98 @@
+# OGX stack config (ogx-server sidecar in templates/deployment.yaml). Adapted from the
+# upstream ai-agent repo: one inference provider ("router"), pointed at the platform's own
+# LiteLLM gateway instead of an external MaaS Nemotron endpoint. The `${env.X}` syntax
+# belongs to OGX's own config loader, not Helm: it is resolved by the ogx-server process
+# from its container env, not by Argo CD. Do not confuse it with a Helm/Go template action.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: triage-agent-ogx-config
+  labels:
+    app: triage-agent
+data:
+  stack_run_config.yaml: |
+    version: '2'
+    distro_name: sovereign-triage-agent
+
+    apis:
+      - inference
+      - responses
+      - tool_runtime
+      - vector_io
+      - files
+
+    providers:
+      inference:
+        - provider_id: router
+          provider_type: remote::vllm
+          config:
+            base_url: ${env.VLLM_URL}
+            max_tokens: ${env.VLLM_MAX_TOKENS:=4096}
+            api_token: ${env.VLLM_API_TOKEN}
+            network:
+              tls:
+                verify: ${env.VLLM_TLS_VERIFY:=true}
+
+      responses:
+        - provider_id: builtin
+          provider_type: inline::builtin
+          config:
+            persistence:
+              responses:
+                table_name: responses
+                backend: sql_default
+
+      vector_io:
+        - provider_id: faiss
+          provider_type: inline::faiss
+          config:
+            persistence:
+              namespace: vector_io::faiss
+              backend: kv_default
+
+      tool_runtime:
+        - provider_id: model-context-protocol
+          provider_type: remote::model-context-protocol
+          config: {}
+
+      files:
+        - provider_id: builtin-files
+          provider_type: inline::localfs
+          config:
+            storage_dir: /tmp/ogx/files
+            metadata_store:
+              table_name: files_metadata
+              backend: sql_default
+
+    storage:
+      backends:
+        kv_default:
+          type: kv_sqlite
+          db_path: /tmp/ogx/kvstore.db
+        sql_default:
+          type: sql_sqlite
+          db_path: /tmp/ogx/sql_store.db
+      stores:
+        metadata:
+          namespace: registry
+          backend: kv_default
+        inference:
+          table_name: inference_store
+          backend: sql_default
+        conversations:
+          table_name: openai_conversations
+          backend: sql_default
+        prompts:
+          table_name: prompts
+          backend: sql_default
+
+    registered_resources:
+      models:
+        - metadata: {}
+          model_id: {{ .Values.model | quote }}
+          provider_id: router
+          provider_model_id: {{ .Values.model | quote }}
+          model_type: llm
+
+    server:
+      port: 8321

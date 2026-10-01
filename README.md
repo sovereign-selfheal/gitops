@@ -33,6 +33,11 @@ Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/obser
 | `presidio` | `maas-routing` | 1 | Deployment (2 replicas), PodDisruptionBudget, Service, NetworkPolicy (no egress) |
 | `litellm-router` | `maas-routing` | 2 | ConfigMap (config + hook code + policies), Deployment (2 replicas), PodDisruptionBudget, Service (API port 80, metrics 9091), ServiceMonitor, NetworkPolicy (4000 from the gateway, 9091 from monitoring), Perses dashboards `sovereign-at-a-glance` (audience), `routing-decisions` (demo) and `stack-operations` (team) and their datasources (only with `observability.enabled`) |
 | `frontdoor` | `maas-routing` | 3 | HTTPRoute, AuthPolicy (API key; refuses `/metrics`), TokenRateLimitPolicy |
+| `quarkus-buggy-app` | `agentic-triage` | 1 | Deployment, Service, ServiceMonitor, Route (target of the triage demo, injects random 500s/503s/latency) |
+| `ticketing-system` | `agentic-triage` | 1 | Deployment (1 replica, SQLite on a PVC), Service, Route (incident dashboard) |
+| `prometheus-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to `cluster-monitoring-view`) |
+| `ticketing-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR |
+| `triage-agent` | `agentic-triage` | 4 | ServiceAccount, own tier `ExternalSecret`, Deployment, Service, Route (Gradio chat UI) |
 
 Presidio and LiteLLM run 2 replicas each (value `replicas` of the component), so one pod or node can
 fail without stopping the router. A preferred pod anti-affinity puts the replicas on different nodes
@@ -173,6 +178,34 @@ repo. Without them the seed sets `sota.enabled: false`, and the router runs in *
 the alias `sota-smart` points to the local model, so the gates and policies work as usual, but every
 request is served by the local model. The router logs still show `routed_to: sota-smart` when a gate
 chooses "SOTA".
+
+## AI-driven triage demo
+
+The `agentic-triage` namespace hosts a self-contained demo, imported from
+[`matteo-grimaldi/ocp-trobleshooter-demo`](https://github.com/matteo-grimaldi/ocp-trobleshooter-demo):
+
+```
+triage-agent (Gradio UI) ──> OGX sidecar (server-side agentic loop, same pod)
+                                 ├──> router.<appsDomain>/v1, model "auto"   (same gateway as any other client, tier "agents")
+                                 ├──> prometheus-mcp-server (MCP) ──> Thanos Querier  (error rates, latency of quarkus-buggy-app)
+                                 └──> ticketing-mcp-server (MCP) ──> ticketing-system  (create/read/update incidents)
+```
+
+- **`quarkus-buggy-app`**: a target application that injects random failures (30% `500` on
+  `/api/products`, 40% `503` on `/api/inventory`, 20% 3s latency on `/api/orders`) and generates its own
+  traffic, so error metrics move even without manual requests.
+- **`ticketing-system`**: a ServiceNow Table API simulator (dashboard at its Route).
+- **`prometheus-mcp-server`** / **`ticketing-mcp-server`**: MCP tool servers (`MCPServer` CR, needs the
+  ansible-owned MCP lifecycle operator).
+- **`triage-agent`**: keeps the upstream demo's OGX sidecar (server-side agentic loop, native MCP tool
+  calling) but drops its **external MaaS endpoint** — OGX is configured to call this platform's own
+  LiteLLM router (model `auto`) instead, so the privacy gate and local/SOTA routing apply to its traffic
+  too. Source and images: `triage-agent`, `mock-ticketing-system`, `quarkus-buggy-app`,
+  `prometheus-mcp-server` repos (see `AGENTS.md` §4); the OGX sidecar image itself is a third-party image
+  (`ogxai/distribution-starter`), pinned by digest in `gitops` only, not built by any of those repos.
+
+Try the demo prompts from the chat UI's Route, or open an incident manually against the ticketing
+system's `/api/incidents` endpoint and ask the agent to investigate it.
 
 ## Router code and images
 

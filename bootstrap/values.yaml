@@ -37,6 +37,8 @@ namespaces:
   models: local-models
   router: maas-routing
   observability: observability
+  # AI-driven triage demo (quarkus-buggy-app, ticketing-system, both MCP servers, triage-agent).
+  triage: agentic-triage
 
 # ----- Observability (traces of the router) --------------------------------------
 # Set by the seed from observability_enabled. true: component observability (Tempo and the
@@ -96,6 +98,12 @@ tiers:
     window: 1m
   - name: legal
     tokens: 20000
+    window: 5m
+  # Own credential of the triage-agent (components/triage-agent), so its tool-calling loop
+  # (Prometheus + ticketing MCP round trips, several model calls per investigation) has a
+  # budget separate from human tiers above.
+  - name: agents
+    tokens: 200000
     window: 5m
 
 # ----- Local model profiles --------------------------------------------------------
@@ -279,3 +287,27 @@ components:
     enabled: true
     wave: 3
     namespaceRef: router
+  # AI-driven triage demo: a buggy sample app, a ticketing system it can be reported to,
+  # two MCP tool servers (Prometheus + ticketing), and an agent that ties them together.
+  # Source and images: see AGENTS.md section 3b.
+  quarkus-buggy-app:
+    enabled: true
+    wave: 1
+    namespaceRef: triage
+  ticketing-system:
+    enabled: true
+    wave: 1
+    namespaceRef: triage
+  prometheus-mcp-server:
+    enabled: true
+    wave: 2
+    namespaceRef: triage
+  ticketing-mcp-server:
+    enabled: true
+    wave: 2
+    namespaceRef: triage
+  triage-agent:
+    enabled: true
+    # After frontdoor (wave 3): the agent calls router.<appsDomain>, which frontdoor exposes.
+    wave: 4
+    namespaceRef: triage

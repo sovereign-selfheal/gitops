@@ -1,0 +1,8 @@
+apiVersion: v2
+name: triage-agent
+description: >-
+  Gradio UI backed by an OGX sidecar (server-side agentic loop) that investigates
+  quarkus-buggy-app using the prometheus-mcp-server and ticketing-mcp-server tools,
+  calling the platform's own LiteLLM router for inference.
+type: application
+version: 0.1.0

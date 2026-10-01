@@ -1,0 +1,7 @@
+apiVersion: v2
+name: ticketing-mcp-server
+description: >-
+  MCP server that wraps the ticketing-system REST API as MCP tools (create_incident,
+  list_incidents, get_incident, update_incident, add_work_note).
+type: application
+version: 0.1.0

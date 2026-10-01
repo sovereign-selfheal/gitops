@@ -1,0 +1,42 @@
+# Own router credential, generated in the cluster (same recipe as components/secrets),
+# because it must be mounted from this namespace: the litellm-apikey AuthPolicy
+# (components/frontdoor) validates keys by label across all namespaces
+# (allNamespaces: true, selector app=maas-litellm), but a Secret can only be mounted by
+# a Pod in its own namespace. refreshInterval "0": generated once, never rotated.
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: triage-agent-apikey
+spec:
+  length: {{ .Values.apiKey.length }}
+  digits: 10
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: triage-agent-apikey
+spec:
+  refreshInterval: "0"
+  target:
+    name: triage-agent-apikey
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      metadata:
+        # Read by the AuthPolicy (component frontdoor): maas-group is the tier. Must
+        # match one entry of global.tiers (bootstrap/values.yaml), see .Values.apiKeyTier.
+        labels:
+          authorino.kuadrant.io/managed-by: authorino
+          app: maas-litellm
+          maas-group: {{ .Values.apiKeyTier }}
+      data:
+        api_key: {{ printf "%s{{ .password }}" .Values.apiKey.prefix | quote }}
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: triage-agent-apikey
