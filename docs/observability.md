@@ -17,6 +17,7 @@ the cluster: the collector, Tempo and Prometheus run in the cluster, and nothing
 | Spans and router metrics | `router` repo (hook code, v0.5.0+) | LiteLLM pods |
 | `otel` and `prometheus` callbacks, `OTEL_*` env, metrics port 9091, ServiceMonitor | component `litellm-router` | namespace `maas-routing` |
 | vLLM metrics (ServiceMonitor `<model>-metrics`) | created by RHOAI | namespace `local-models` |
+| Decision model: vLLM metrics on port 8000, NetworkPolicy `dgemma-decision-metrics` from monitoring | component `decision-model` | namespace `local-models` |
 
 ## The dashboard
 
@@ -64,6 +65,10 @@ above. Two variables choose the router pods and the model pods. It refreshes eve
   answer time p90 and SOTA -> local fallbacks, by pod.
 - **Local model and GPU**: requests running and waiting in vLLM, tokens per second (generated and prompt),
   KV cache used; with the `gpu` profile also GPU utilization, memory and power (NVIDIA DCGM exporter).
+  The model pods variable lists only the pods of the local model (label `model_name`).
+- **Decision model and GPU** (only with `decisionModel.enabled`): vLLM requests per second behind the
+  decision server, latency per vLLM request (p50 and p95), GPU utilization and memory of its pod. The
+  vLLM series carry `model_name="dgemma"`; the decision server itself has no metrics.
 - **Gateway**: one gauge per tier of `tiers` (tokens in the last window against the limit; approximate,
   because Limitador counts in a fixed window that starts with the first call), tokens counted and 429
   answers per minute by tier, API key checks of Authorino per minute.

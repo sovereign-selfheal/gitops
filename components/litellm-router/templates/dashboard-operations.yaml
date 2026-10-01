@@ -3,6 +3,8 @@
 {{- $models := .Values.global.namespaces.models }}
 {{- $kuadrant := .Values.dashboard.kuadrantNamespace }}
 {{- $gpu := eq .Values.global.modelProfile "gpu" }}
+{{- $dm := .Values.global.decisionModel | default dict }}
+{{- $decision := and $gpu $dm.enabled }}
 # Perses dashboard for the team (Observe -> Dashboards, project {{ $ns }}): the router per pod,
 # the local model and its GPU, the token budgets of the gateway. The demo view is the dashboard
 # routing-decisions. Same datasource (router-prometheus, Thanos): the queries read the metrics of
@@ -45,7 +47,8 @@ spec:
               datasource: {kind: PrometheusDatasource, name: router-prometheus}
               labelName: pod
               matchers:
-                - {{ printf "vllm:num_requests_running{namespace=%q}" $models | quote }}
+                # Only the pods of the local model: the decision model (when on) has its own row.
+                - {{ printf "vllm:num_requests_running{namespace=%q,model_name=%q}" $models .Values.global.localModel.name | quote }}
     layouts:
       - kind: Grid
         spec:
@@ -69,6 +72,16 @@ spec:
             - {x: 8, "y": 8, width: 8, height: 8, content: {$ref: "#/spec/panels/gpuMemory"}}
             - {x: 16, "y": 8, width: 8, height: 8, content: {$ref: "#/spec/panels/gpuPower"}}
             {{- end }}
+      {{- if $decision }}
+      - kind: Grid
+        spec:
+          display:
+            title: {{ printf "Decision model %s (namespace %s) and GPU" $dm.name $models | quote }}
+          items:
+            - {x: 0, "y": 0, width: 8, height: 8, content: {$ref: "#/spec/panels/decisionRequests"}}
+            - {x: 8, "y": 0, width: 8, height: 8, content: {$ref: "#/spec/panels/decisionLatency"}}
+            - {x: 16, "y": 0, width: 8, height: 8, content: {$ref: "#/spec/panels/decisionGpu"}}
+      {{- end }}
       - kind: Grid
         spec:
           display:
@@ -303,6 +316,85 @@ spec:
                     datasource: {kind: PrometheusDatasource, name: router-prometheus}
                     query: {{ printf "max by (exported_pod, gpu) (DCGM_FI_DEV_POWER_USAGE{exported_namespace=%q,exported_pod=~\"$model_pod\"})" $models | quote }}
                     seriesNameFormat: {{ "W, GPU {{gpu}} {{exported_pod}}" | quote }}
+      {{- end }}
+      {{- if $decision }}
+      {{- $dsel := printf "namespace=%q,model_name=%q" $models $dm.servedModelName }}
+      decisionRequests:
+        kind: Panel
+        spec:
+          display:
+            name: Decision model requests per second
+            description: Calls of vLLM behind the decision server (C2 classifier of the router, agents). One /v1/systemone call is one or more vLLM requests (noise draws)
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 1}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (pod) (rate(vllm:e2e_request_latency_seconds_count{%s}[$__rate_interval]))" $dsel | quote }}
+                    seriesNameFormat: {{ "{{pod}}" | quote }}
+      decisionLatency:
+        kind: Panel
+        spec:
+          display:
+            name: Decision model latency per vLLM request
+            description: One denoising step over the answer canvas; long prompts cost prefill time
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: seconds, decimalPlaces: 2}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "histogram_quantile(0.5, sum by (le) (rate(vllm:e2e_request_latency_seconds_bucket{%s}[$__rate_interval])))" $dsel | quote }}
+                    seriesNameFormat: p50
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "histogram_quantile(0.95, sum by (le) (rate(vllm:e2e_request_latency_seconds_bucket{%s}[$__rate_interval])))" $dsel | quote }}
+                    seriesNameFormat: p95
+      decisionGpu:
+        kind: Panel
+        spec:
+          display:
+            name: Decision model GPU utilization and memory
+            description: NVIDIA DCGM exporter, the GPU of the decision model pod
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: percent, decimalPlaces: 0}, min: 0, max: 100}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "max by (exported_pod, gpu) (DCGM_FI_DEV_GPU_UTIL{exported_namespace=%q,exported_pod=~\"%s-predictor-.*\"})" $models $dm.name | quote }}
+                    seriesNameFormat: {{ "utilization, GPU {{gpu}} {{exported_pod}}" | quote }}
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "100 * max by (exported_pod, gpu) (DCGM_FI_DEV_FB_USED{exported_namespace=%q,exported_pod=~\"%s-predictor-.*\"}) / max by (exported_pod, gpu) (DCGM_FI_DEV_FB_USED{exported_namespace=%q,exported_pod=~\"%s-predictor-.*\"} + DCGM_FI_DEV_FB_FREE{exported_namespace=%q,exported_pod=~\"%s-predictor-.*\"})" $models $dm.name $models $dm.name $models $dm.name | quote }}
+                    seriesNameFormat: {{ "memory, GPU {{gpu}} {{exported_pod}}" | quote }}
       {{- end }}
       {{- range $t := .Values.global.tiers }}
       budget_{{ $t.name }}:

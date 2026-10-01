@@ -225,7 +225,8 @@ spec:
                   kind: PrometheusTimeSeriesQuery
                   spec:
                     datasource: {kind: PrometheusDatasource, name: router-prometheus}
-                    query: {{ printf "avg(DCGM_FI_DEV_GPU_UTIL{exported_namespace=%q}) or vector(0)" .Values.global.namespaces.models | quote }}
+                    # Only the GPU of the local model: the decision model (when on) has its own GPU.
+                    query: {{ printf "avg(DCGM_FI_DEV_GPU_UTIL{exported_namespace=%q,exported_pod=~\"%s-predictor-.*\"}) or vector(0)" .Values.global.namespaces.models .Values.global.localModel.name | quote }}
                     seriesNameFormat: GPU
       {{- end }}
 {{- end }}
