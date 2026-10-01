@@ -112,12 +112,14 @@ extra opinion. `classifier.mode` selects that LLM:
 
 | Mode | Classifier | Notes |
 |---|---|---|
-| `local` (default) | The local model (Qwen3.8 27B on GPU) | The prompt never leaves the cluster, also while it is classified. No secret needed |
+| `local` (default) | The local model (Qwen3.8 27B on GPU); with `decisionModel.enabled`, the decision model first (`systemone` backend, router v0.7.0), then Qwen3.8 as fallback | The prompt never leaves the cluster, also while it is classified. No secret needed |
 | `external` | An external model | Settings from the secret store (`classifier-provider-secret`) |
 | `off` | None | The rules alone decide |
 
 The classifier can only make a prompt more sensitive, never less. On an error or a timeout (8 s), the
-prompt is treated as sensitive and stays on the local model.
+prompt is treated as sensitive and stays on the local model. With the decision model, an error or a timeout of the decision server
+first falls back to Qwen3.8; only when that fails too, the prompt stays local. The log reason names the
+backend that decided: `systemone/llm@0.93` or `fallback/llm@0.90`.
 
 ## Decision model
 

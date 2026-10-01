@@ -64,13 +64,31 @@ spec:
               value: "true"
             {{- end }}
             {{- if eq .Values.global.classifier.mode "local" }}
-            # C2 classifier = the local model: the prompt never leaves the cluster.
+            {{- $dm := .Values.global.decisionModel | default dict }}
+            {{- $qwenUrl := printf "http://%s-predictor.%s.svc.cluster.local/v1" .Values.global.localModel.name .Values.global.namespaces.models }}
+            # C2 classifier = a local model: the prompt never leaves the cluster.
             - name: CLASSIFIER_ENABLED
               value: "1"
+            {{- if $dm.enabled }}
+            # With the decision model (router v0.7.0 or later): C2 asks the decision server
+            # (systemone backend). On an error or a timeout it asks the local chat model
+            # (fallback); only when both fail, the prompt stays LOCAL (fail-closed).
+            - name: CLASSIFIER_BACKEND
+              value: systemone
             - name: CLASSIFIER_BASE_URL
-              value: {{ printf "http://%s-predictor.%s.svc.cluster.local/v1" .Values.global.localModel.name .Values.global.namespaces.models | quote }}
+              value: {{ printf "http://%s-predictor.%s.svc.cluster.local/v1" $dm.name .Values.global.namespaces.models | quote }}
+            - name: CLASSIFIER_MODEL
+              value: {{ $dm.servedModelName | quote }}
+            - name: CLASSIFIER_FALLBACK_BASE_URL
+              value: {{ $qwenUrl | quote }}
+            - name: CLASSIFIER_FALLBACK_MODEL
+              value: {{ .Values.global.localModel.name | quote }}
+            {{- else }}
+            - name: CLASSIFIER_BASE_URL
+              value: {{ $qwenUrl | quote }}
             - name: CLASSIFIER_MODEL
               value: {{ .Values.global.localModel.name | quote }}
+            {{- end }}
             - name: CLASSIFIER_GRAY_LOW
               value: {{ .Values.global.classifier.grayLow | quote }}
             # The local model reasons by default (Qwen3). The classifier needs a short JSON
