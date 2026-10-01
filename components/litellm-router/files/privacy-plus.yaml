@@ -152,8 +152,8 @@ ner:
   # 0.052 and 10 give a margin of about 1.5x. The bound is per call: Presidio is called twice
   # (en and it) when the language is uncertain. Several agents at once queue on Presidio: a
   # longer timeout does not fix that.
-  timeout_per_1k_chars: 0     # suggested: 0.052
-  timeout_max_seconds: 3.0    # suggested: 10
+  timeout_per_1k_chars: 0.052
+  timeout_max_seconds: 10.0
   min_confidence: 0.60
   entity_weights:
     PERSON: 0.60
@@ -204,8 +204,8 @@ classifier:
   # systemone 0.69 s / 3.78 s / 10.6 s, chat on Qwen3.8 0.79 s / 3.28 s / 8.1 s at 18k / 71k /
   # 143k characters; 0.11 and 15 give a margin of about 1.4x. With the suggested values the
   # worst case of the privacy gate is 2 x 10 + 2 x 15 = 50 s.
-  timeout_per_1k_chars: 0     # suggested: 0.11
-  timeout_max_seconds: 8.0    # suggested: 15
+  timeout_per_1k_chars: 0.11
+  timeout_max_seconds: 15.0
   max_tokens: 200
   temperature: 0.0
   # Backend params injected from the Secret (classifier-provider-secret) via env, so

@@ -87,8 +87,8 @@ efficiency:
   # Log text has about 2.3 characters per token (measured on 2026-10-01), English prose about 4:
   # a cap computed for log text is safe and keeps prose LOCAL earlier than needed. Example: a
   # 65,536-token window, max_tokens 8192 (components/triage-agent) and a 10% margin give about
-  # 51,000 tokens, so about 117000 characters. Off until the window of the SOTA model is known.
-  sota_max_prompt_chars: 0
+  # 51,000 tokens, so about 117000 characters.
+  sota_max_prompt_chars: 117000
 
 # --- Gate 2 — privacy --------------------------------------------------------
 # Reuses the hardened privacy-plus engine (A regex+validators, B lexicons,
