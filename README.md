@@ -32,7 +32,7 @@ Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/obser
 | `decision-model` | `local-models` | 1 | Only with `decisionModel.enabled`: ServingRuntime (vLLM structured-read and the example decision server), InferenceService `dgemma-decision`, HardwareProfile, ConfigMap (decision server script), NetworkPolicies. See "Decision model" |
 | `presidio` | `maas-routing` | 1 | Deployment (2 replicas), PodDisruptionBudget, Service, NetworkPolicy (no egress) |
 | `litellm-router` | `maas-routing` | 2 | ConfigMap (config + hook code + policies), Deployment (2 replicas), PodDisruptionBudget, Service (API port 80, metrics 9091), ServiceMonitor, NetworkPolicy (4000 from the gateway, 9091 from monitoring), Perses dashboards `sovereign-at-a-glance` (audience), `routing-decisions` (demo) and `stack-operations` (team) and their datasources (only with `observability.enabled`) |
-| `frontdoor` | `maas-routing` | 3 | HTTPRoute, AuthPolicy (API key; refuses `/metrics`), TokenRateLimitPolicy |
+| `frontdoor` | `maas-routing` | 3 | HTTPRoute, AuthPolicy (API key; refuses `/metrics`), TokenRateLimitPolicy (POST requests only) |
 | `quarkus-buggy-app` | `agentic-triage` | 1 | Deployment, Service, ServiceMonitor, Route (target of the triage demo, injects random 500s/503s/latency) |
 | `ticketing-system` | `agentic-triage` | 1 | Deployment (1 replica, SQLite on a PVC), Service, Route (incident dashboard) |
 | `prometheus-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to `cluster-monitoring-view`) |
@@ -45,6 +45,9 @@ when it can; it never blocks scheduling. The token budgets per tier (TokenRateLi
 all pods: Limitador keeps one counter per tier. The SOTA token cap of the router (`sota_token_budget` in
 `components/litellm-router/files/chain.yaml`) is off (0): it would count in memory per pod, with no time
 window. The spend limit on SOTA is the quota of the provider on its API key.
+
+Known problems of the platform components and their workarounds (for example the token budgets
+count POST requests only) are in [docs/known-issues.md](docs/known-issues.md).
 
 ## Values
 

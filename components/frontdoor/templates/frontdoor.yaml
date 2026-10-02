@@ -64,6 +64,8 @@ spec:
                   expression: auth.identity.metadata.labels["maas-group"]
 ---
 # Token budget per tier (counted on LLM usage tokens).
+# Only POST requests (inference calls) are counted: on RHCL 1.4.3 a response without `usage`
+# (GET /v1/models) left the keep-alive connection hanging. See docs/known-issues.md.
 apiVersion: kuadrant.io/v1alpha1
 kind: TokenRateLimitPolicy
 metadata:
@@ -78,6 +80,7 @@ spec:
     {{ .name }}-tier:
       when:
         - predicate: {{ printf "auth.tier.group == %q" .name | squote }}
+        - predicate: "request.method == 'POST'"
       counters:
         - expression: auth.tier.group
       rates:
