@@ -1,0 +1,33 @@
+# User workload monitoring evaluates PrometheusRule objects in the workload namespace.
+# This chart deploys to `observability`, but the rule must live in `agentic-triage` so PromQL
+# can use metrics scraped from quarkus-buggy-app (ServiceMonitor in that namespace).
+{{- $ns := required "global.namespaces.triage is required" .Values.global.namespaces.triage }}
+{{- $app := .Values.alerts.quarkusBuggyApp.service }}
+{{- $threshold := .Values.alerts.quarkusBuggyApp.errorRateThreshold }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: quarkus-buggy-app-error-rate
+  namespace: {{ $ns }}
+  labels:
+    app: quarkus-buggy-app
+spec:
+  groups:
+    - name: quarkus-buggy-app
+      rules:
+        - alert: QuarkusBuggyAppHighErrorRate
+          expr: |
+            (
+              sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",service="{{ $app }}",status=~"5.."}[5m]))
+              /
+              sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",service="{{ $app }}"}[5m]))
+            ) > {{ $threshold }}
+          for: {{ .Values.alerts.quarkusBuggyApp.for }}
+          labels:
+            severity: {{ .Values.alerts.quarkusBuggyApp.severity }}
+          annotations:
+            summary: Quarkus demo app HTTP error rate is above the configured threshold
+            description: >-
+              The share of HTTP 5xx responses from {{ $app }} in namespace {{ $ns }}
+              (http_server_requests_seconds_count, status=~"5..") exceeded
+              {{ $threshold }} over the last 5 minutes.
