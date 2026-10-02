@@ -46,7 +46,7 @@ spec:
             - name: SQLITE_STORE_DIR
               value: /tmp/ogx
             # The platform gateway (component frontdoor): same endpoint external MaaS
-            # clients use. Model "auto" (registered in stack_run_config.yaml) lets the
+            # clients use. Model "router/auto" (listed by OGX from the router) lets the
             # policy hook of components/litellm-router pick the real target per request.
             - name: VLLM_URL
               value: {{ printf "https://router.%s/v1" (required "global.appsDomain is required" .Values.global.appsDomain) | quote }}
@@ -60,7 +60,7 @@ spec:
                   name: triage-agent-apikey
                   key: api_key
             - name: INFERENCE_MODEL
-              value: {{ .Values.model | quote }}
+              value: {{ printf "router/%s" .Values.model | quote }}
             - name: OPENAI_MAX_RETRIES
               value: "8"
           volumeMounts:
@@ -106,7 +106,7 @@ spec:
             - name: OGX_BASE_URL
               value: http://localhost:8321
             - name: ROUTER_MODEL
-              value: {{ .Values.model | quote }}
+              value: {{ printf "router/%s" .Values.model | quote }}
             - name: PROMETHEUS_MCP_URL
               value: {{ printf "http://prometheus-mcp-server.%s.svc:8080/mcp" (required "global.namespaces.triage is required" .Values.global.namespaces.triage) | quote }}
             - name: TICKETING_MCP_URL
