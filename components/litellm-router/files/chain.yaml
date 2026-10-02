@@ -82,13 +82,18 @@ efficiency:
   # request stays LOCAL (reason "efficiency: SOTA context limit") and no detector runs: the SOTA
   # model could not take it, and Presidio and C2 would spend seconds on it for nothing. A counting
   # error also routes LOCAL. Characters, not tokens: the router has no tokenizer, and the SOTA
-  # model counts with its own. Choose the value as
-  #   (SOTA context window - max_tokens of the agents - margin) x characters per token.
-  # Log text has about 2.3 characters per token (measured on 2026-10-01), English prose about 4:
-  # a cap computed for log text is safe and keeps prose LOCAL earlier than needed. Example: a
-  # 65,536-token window, max_tokens 8192 (components/triage-agent) and a 10% margin give about
-  # 51,000 tokens, so about 117000 characters.
-  sota_max_prompt_chars: 117000
+  # model counts with its own. The cap is the smallest of two limits:
+  #   1. the SOTA model: (context window - max_tokens of the agents - margin) x characters per token.
+  #      Log text has about 2.3 characters per token for Qwen and about 1.6 for Gemini (dense logs),
+  #      English prose about 4.
+  #   2. the detectors: the largest text that Presidio and C2 read within their timeouts
+  #      (ner.* and classifier.* in privacy-plus.yaml).
+  # Since 2026-10-02 the SOTA model is gemini-2.5-pro (1,048,576-token window; 252k tokens tested),
+  # so limit 2 decides. Measured on ocp.48hlt with new text at each call (worst case): at 150,000
+  # characters Presidio takes 5.4 s (timeout 7.8 s) and C2 systemone 11.7 s (timeout 15 s); at
+  # about 179,000 characters systemone passes 15 s. Details: docs/sota-size-cap-2026-10-02.md in
+  # the router repo. With the old 65,536-token window the formula gave 117000.
+  sota_max_prompt_chars: 150000
 
 # --- Gate 2 — privacy --------------------------------------------------------
 # Reuses the hardened privacy-plus engine (A regex+validators, B lexicons,
