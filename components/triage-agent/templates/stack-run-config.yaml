@@ -86,13 +86,9 @@ data:
           table_name: prompts
           backend: sql_default
 
-    registered_resources:
-      models:
-        - metadata: {}
-          model_id: {{ .Values.model | quote }}
-          provider_id: router
-          provider_model_id: {{ .Values.model | quote }}
-          model_type: llm
-
+    # No registered_resources.models: OGX lists the models of the router itself at startup and
+    # names them "router/<model>" (router/auto, router/local-fast, router/sota-smart). OGX 1.4
+    # reads provider_model_id "auto" as "the first model of the provider" (local-fast): a model
+    # registered here as "auto" conflicted with the listed "router/auto" and OGX did not start.
     server:
       port: 8321

@@ -18,10 +18,10 @@ replicas: 1
 # tag latest, resolved on docker.io on 2026-09-29
 ogxImage: docker.io/ogxai/distribution-starter@sha256:9d6afd54417bee1f37768a054e198becfadbed21d270d8ec1cdfb699e35e9924
 
-# Model alias the agent calls (components/litellm-router): "auto" lets the policy hook
-# pick the real target (local model or SOTA) per request, same as any other client. OGX's
-# stack_run_config.yaml (templates/stack-run-config.yaml) registers this same name as its
-# only model, so INFERENCE_MODEL and this value must be kept equal.
+# Model alias of the router the agent calls (components/litellm-router): "auto" lets the
+# policy hook pick the real target (local model or SOTA) per request, same as any other
+# client. OGX lists the router models itself and adds the provider prefix, so the agent and
+# OGX use "router/<model>" (ROUTER_MODEL, INFERENCE_MODEL in templates/deployment.yaml).
 model: auto
 
 # The router's TLS certificate is expected to be valid (OpenShift wildcard/ACME): keep
