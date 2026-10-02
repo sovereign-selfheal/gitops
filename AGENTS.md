@@ -90,11 +90,11 @@ this repo: this repo only pins their image digests, same as `presidio`.
 
 | Owner | Items |
 |---|---|
-| `triage-agent` | Gradio UI (`app.py`, `agent.py`), a thin client of the OGX sidecar's Responses API, the static `knowledge.md` (baked into the image), image `quay.io/sovereign-selfheal/triage-agent` |
+| `triage-agent` | Gradio UI (`app.py`, `agent.py`), a thin client of the OGX sidecar's Responses API, image `quay.io/sovereign-selfheal/triage-agent` |
 | `mock-ticketing-system` | Two subfolders, two images: `ticketing-system` (FastAPI ServiceNow simulator) and `ticketing-mcp-server` (FastMCP wrapper), `quay.io/sovereign-selfheal/ticketing-system` and `quay.io/sovereign-selfheal/ticketing-mcp-server` |
 | `quarkus-buggy-app` | Quarkus 3 source, built with the Jib extension, image `quay.io/sovereign-selfheal/quarkus-buggy-app` |
 | `prometheus-mcp-server` | FastMCP server wrapping PromQL against Thanos, image `quay.io/sovereign-selfheal/prometheus-mcp-server` |
-| `gitops` (this repo) | Every Kubernetes object in `agentic-triage` (`components/quarkus-buggy-app`, `components/ticketing-system`, `components/ticketing-mcp-server`, `components/prometheus-mcp-server`, `components/triage-agent`), the image digests in use, including the third-party OGX sidecar image and its `stack_run_config.yaml` (ConfigMap, `components/triage-agent/templates/stack-run-config.yaml`) |
+| `gitops` (this repo) | Every Kubernetes object in `agentic-triage` (`components/quarkus-buggy-app`, `components/ticketing-system`, `components/ticketing-mcp-server`, `components/prometheus-mcp-server`, `components/triage-agent`), the image digests in use, including the third-party OGX sidecar image and its `stack_run_config.yaml` (ConfigMap, `components/triage-agent/templates/stack-run-config.yaml`) and per-agent `knowledge.md` (`components/triage-agent/files/knowledge.md`, mounted via ConfigMap) |
 
 1. **Images by digest.** Same pin convention as §3: `# tag vX.Y.Z, resolved on quay.io on <date>`. A new
    version is a PR here. The OGX sidecar (`docker.io/ogxai/distribution-starter`) follows the same rule
