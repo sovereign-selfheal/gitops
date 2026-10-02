@@ -1,4 +1,7 @@
-global: {}
+# `global` is passed by the bootstrap chart. The defaults below exist only for `helm lint`.
+global:
+  namespaces:
+    triage: agentic-triage
 
 # The images of Tempo and of the collector come from the Tempo and OpenTelemetry operators,
 # which the ansible repo pins by CSV: a new image version is an operator pin change there.
@@ -35,3 +38,12 @@ collector:
     limits:
       cpu: 500m
       memory: 512Mi
+
+# User workload Prometheus alerts (PrometheusRule in the triage namespace).
+alerts:
+  quarkusBuggyApp:
+    # HTTP 5xx share = requests with status 5xx / all requests (http_server_requests_seconds_count).
+    errorRateThreshold: 0.10
+    for: 5m
+    severity: warning
+    service: quarkus-buggy-app
