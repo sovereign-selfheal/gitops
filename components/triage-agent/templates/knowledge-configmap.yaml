@@ -1,0 +1,14 @@
+# Application knowledge for the triage-agent container (mounted at knowledge.mountPath).
+# Edit files/knowledge.md for the default demo agent, or set knowledge.existingConfigMap
+# when deploying another agent instance with its own ConfigMap.
+{{- if not .Values.knowledge.existingConfigMap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: triage-agent-knowledge
+  labels:
+    app: triage-agent
+data:
+  {{ .Values.knowledge.file }}: |
+    {{- $.Files.Get (printf "files/%s" .Values.knowledge.file) | nindent 4 }}
+{{- end }}

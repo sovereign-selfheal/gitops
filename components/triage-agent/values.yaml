@@ -32,6 +32,14 @@ vllmTlsVerify: true
 # AGENTS.md section 3b). Empty: the agent runs without that tool.
 ocpMcpUrl: ""
 
+# Static application knowledge injected into the agent system prompt (KNOWLEDGE_FILE).
+# Default: render triage-agent-knowledge from files/knowledge.md. For another agent
+# instance, point existingConfigMap at a different ConfigMap (same data key: knowledge.file).
+knowledge:
+  mountPath: /etc/triage-agent
+  file: knowledge.md
+  existingConfigMap: ""
+
 # Own tier of the router token budget (bootstrap/values.yaml `tiers`): keep this name
 # equal to one entry of global.tiers, or the agent's calls are not rate-limited at all.
 apiKeyTier: agents

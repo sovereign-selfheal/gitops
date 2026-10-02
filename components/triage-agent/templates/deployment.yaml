@@ -116,8 +116,14 @@ spec:
             # runs without that tool.
             - name: OCP_MCP_URL
               value: {{ .Values.ocpMcpUrl | default "" | quote }}
+            - name: KNOWLEDGE_FILE
+              value: {{ printf "%s/%s" .Values.knowledge.mountPath .Values.knowledge.file | quote }}
             - name: PYTHONUNBUFFERED
               value: "1"
+          volumeMounts:
+            - name: agent-knowledge
+              mountPath: {{ .Values.knowledge.mountPath }}
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /
@@ -145,6 +151,9 @@ spec:
         - name: ogx-config
           configMap:
             name: triage-agent-ogx-config
+        - name: agent-knowledge
+          configMap:
+            name: {{ .Values.knowledge.existingConfigMap | default "triage-agent-knowledge" }}
         - name: ogx-data
           emptyDir: {}
 ---
