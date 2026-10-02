@@ -130,6 +130,12 @@ localModel:
       extraArgs:
         - --max-model-len=131072
         - --gpu-memory-utilization=0.90
+        # Reuse the prefill of a repeated prefix (agent contexts grow turn by turn). vLLM leaves
+        # it off for this hybrid model; with the flag it uses mamba cache mode "align" and reuses
+        # whole blocks of 1600 tokens (FP8 KV cache). The SSM state stays float32, as set in the
+        # model config (mamba_ssm_dtype). Measurements: router repo,
+        # docs/qwen-prefix-cache-2026-10-02.md.
+        - --enable-prefix-caching
         # Text only: the self-heal agents send no images; skips the vision encoder.
         - --language-model-only
         # Tool calls of the agents, and the reasoning moved out of `content`. The model reasons
