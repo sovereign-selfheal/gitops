@@ -35,11 +35,14 @@ spec:
         value: "1"
 
   runtime:
-    serviceAccountName: prometheus-mcp-server-sa
     replicas: {{ .Values.replicas }}
     resources:
       {{- toYaml .Values.resources | nindent 6 }}
     security:
+      # The CRD has the ServiceAccount here (runtime.security.serviceAccountName). At
+      # runtime.serviceAccountName the field was dropped: the pod ran with the default
+      # ServiceAccount, Thanos answered 403 and the Application stayed OutOfSync.
+      serviceAccountName: prometheus-mcp-server-sa
       podSecurityContext:
         runAsNonRoot: true
         seccompProfile:
