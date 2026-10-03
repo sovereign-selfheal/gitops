@@ -127,7 +127,7 @@ extra opinion. `classifier.mode` selects that LLM:
 The classifier can only make a prompt more sensitive, never less. On an error or a timeout (8 s), the
 prompt is treated as sensitive and stays on the local model. With the decision model, an error or a timeout of the decision server
 first falls back to Qwen3.8; only when that fails too, the prompt stays local. The log reason names the
-backend that decided: `systemone/llm@0.93` or `fallback/llm@0.90`.
+backend that decided: `systemone/llm@0.93(legal)` (router v0.9.0 names the question) or `fallback/llm@0.90`.
 
 ## Decision model
 
