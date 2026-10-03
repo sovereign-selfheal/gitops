@@ -224,11 +224,15 @@ decisionModel:
   # Answer canvas of the structured-read mode, in tokens. vLLM and the decision server must agree.
   canvasLength: 64
   # Flags of the Red Hat quick start (validated with this checkpoint on 2026-09-25, and on an
-  # L40S on 2026-09-30). No flag of the model card was needed.
+  # L40S on 2026-09-30). No flag of the model card was needed. --max-num-seqs: 16 instead of the
+  # quick start's 4 (a value for text generation with a 256-token canvas). With the 64-token
+  # canvas of the decisions, 16 gives about 40 C2 calls/s instead of 18.7, with the same GPU memory
+  # and the same latency for one call; 32 adds almost nothing (router
+  # docs/c2-questions-eval-2026-10-03.md, measured on 2026-10-03).
   extraArgs:
     - --max-logprobs=32
     - --enable-prefix-caching
-    - --max-num-seqs=4
+    - --max-num-seqs=16
     - --gpu-memory-utilization=0.85
     - --enforce-eager
   env:
