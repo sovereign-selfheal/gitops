@@ -1,0 +1,40 @@
+# `global` is passed by the bootstrap chart. The defaults below exist only for `helm lint`.
+global:
+  appsDomain: apps.example.com
+  namespaces:
+    triage: agentic-triage
+
+# Image of the ogx-alert-translator repo (github.com/sovereign-selfheal/ogx-alert-translator).
+# Update the digest after the first Quay tag build (same pin convention as other components).
+# tag v0.1.0, pending first resolve on quay.io on 2026-10-04
+image: quay.io/sovereign-selfheal/ogx-alert-translator:v0.1.0
+replicas: 0
+
+keda:
+  # Primary: KEDA HTTP add-on (installed by ansible). Alertmanager should POST to the
+  # interceptor Service fronting this workload when httpAddon is true.
+  httpAddon:
+    enabled: true
+    minReplicas: 0
+    maxReplicas: 3
+    targetPendingRequests: 1
+    scaledownPeriod: 300
+  # Fallback when the HTTP add-on is not installed: scale on firing alerts (Alertmanager retries).
+  prometheus:
+    enabled: false
+    serverAddress: http://thanos-querier.openshift-monitoring.svc:9091
+    minReplicas: 0
+    maxReplicas: 3
+    cooldownPeriod: 300
+
+# Short timeout: this service only waits for triage-agent's 202 ack on /trigger, not the
+# full (multi-minute) agent run, which triage-agent executes in its own background task.
+requestTimeoutSeconds: 10
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

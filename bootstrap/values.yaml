@@ -311,3 +311,8 @@ components:
     # After frontdoor (wave 3): the agent calls router.<appsDomain>, which frontdoor exposes.
     wave: 4
     namespaceRef: triage
+  ogx-alert-translator:
+    enabled: true
+    # After triage-agent: forwards Alertmanager webhooks to triage-agent OGX on :8321.
+    wave: 5
+    namespaceRef: triage

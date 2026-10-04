@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ogx-alert-translator
+  labels:
+    app: ogx-alert-translator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ogx-alert-translator
+  labels:
+    app: ogx-alert-translator
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: ogx-alert-translator
+  template:
+    metadata:
+      labels:
+        app: ogx-alert-translator
+    spec:
+      serviceAccountName: ogx-alert-translator
+      containers:
+        - name: ogx-alert-translator
+          image: {{ .Values.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: LOG_LEVEL
+              value: INFO
+            # The only outbound dependency: triage-agent's own /trigger endpoint, served
+            # on its existing Service port (7860, shared with the Gradio UI). This service
+            # never talks to OGX, MCP servers, or the router directly — see AGENTS.md.
+            - name: TRIAGE_AGENT_URL
+              value: {{ printf "http://triage-agent.%s.svc:7860" (required "global.namespaces.triage is required" .Values.global.namespaces.triage) | quote }}
+            - name: REQUEST_TIMEOUT_SECONDS
+              value: {{ .Values.requestTimeoutSeconds | quote }}
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 4
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ogx-alert-translator
+  labels:
+    app: ogx-alert-translator
+spec:
+  selector:
+    app: ogx-alert-translator
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
