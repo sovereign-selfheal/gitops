@@ -1,0 +1,41 @@
+{{- if .Values.keda.httpAddon.enabled }}
+apiVersion: http.keda.sh/v1alpha1
+kind: HTTPScaledObject
+metadata:
+  name: ogx-alert-translator
+  labels:
+    app: ogx-alert-translator
+spec:
+  hosts: []
+  targetPendingRequests: {{ .Values.keda.httpAddon.targetPendingRequests }}
+  scaleTargetRef:
+    name: ogx-alert-translator
+    kind: Deployment
+    apiVersion: apps/v1
+    service: ogx-alert-translator
+    port: 8080
+  replicas:
+    min: {{ .Values.keda.httpAddon.minReplicas }}
+    max: {{ .Values.keda.httpAddon.maxReplicas }}
+  scaledownPeriod: {{ .Values.keda.httpAddon.scaledownPeriod }}
+{{- else if .Values.keda.prometheus.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ogx-alert-translator
+  labels:
+    app: ogx-alert-translator
+spec:
+  scaleTargetRef:
+    name: ogx-alert-translator
+  minReplicaCount: {{ .Values.keda.prometheus.minReplicas }}
+  maxReplicaCount: {{ .Values.keda.prometheus.maxReplicas }}
+  cooldownPeriod: {{ .Values.keda.prometheus.cooldownPeriod }}
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.keda.prometheus.serverAddress | quote }}
+        metricName: alertmanager_firing_alerts
+        threshold: "1"
+        query: sum(ALERTS{alertstate="firing"})
+{{- end }}

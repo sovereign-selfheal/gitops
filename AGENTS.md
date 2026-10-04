@@ -84,17 +84,19 @@ These two repos build the custom images and own the router code. The same rules 
 
 ## 4. Contract with the AI-driven triage demo repos
 
-Four repos own the source and the build of the `agentic-triage` namespace workloads (imported from
-`matteo-grimaldi/ocp-trobleshooter-demo`). Unlike `router`, none of them has a code-copy contract with
-this repo: this repo only pins their image digests, same as `presidio`.
+Five repos own the source and the build of the `agentic-triage` namespace workloads (the original demo
+imported from `matteo-grimaldi/ocp-trobleshooter-demo`, plus `ogx-alert-translator`). Unlike `router`,
+none of them has a code-copy contract with this repo: this repo only pins their image digests, same as
+`presidio`.
 
 | Owner | Items |
 |---|---|
 | `triage-agent` | Gradio UI (`app.py`, `agent.py`), a thin client of the OGX sidecar's Responses API, image `quay.io/sovereign-selfheal/triage-agent` |
+| `ogx-alert-translator` | FastAPI Alertmanager webhook bridge to triage-agent OGX (`POST /v1/responses`), image `quay.io/sovereign-selfheal/ogx-alert-translator` |
 | `mock-ticketing-system` | Two subfolders, two images: `ticketing-system` (FastAPI ServiceNow simulator) and `ticketing-mcp-server` (FastMCP wrapper), `quay.io/sovereign-selfheal/ticketing-system` and `quay.io/sovereign-selfheal/ticketing-mcp-server` |
 | `quarkus-buggy-app` | Quarkus 3 source, built with the Jib extension, image `quay.io/sovereign-selfheal/quarkus-buggy-app` |
 | `prometheus-mcp-server` | FastMCP server wrapping PromQL against Thanos, image `quay.io/sovereign-selfheal/prometheus-mcp-server` |
-| `gitops` (this repo) | Every Kubernetes object in `agentic-triage` (`components/quarkus-buggy-app`, `components/ticketing-system`, `components/ticketing-mcp-server`, `components/prometheus-mcp-server`, `components/triage-agent`), the image digests in use, including the third-party OGX sidecar image and its `stack_run_config.yaml` (ConfigMap, `components/triage-agent/templates/stack-run-config.yaml`) and per-agent `knowledge.md` (`components/triage-agent/files/knowledge.md`, mounted via ConfigMap) |
+| `gitops` (this repo) | Every Kubernetes object in `agentic-triage` (`components/quarkus-buggy-app`, `components/ticketing-system`, `components/ticketing-mcp-server`, `components/prometheus-mcp-server`, `components/triage-agent`, `components/ogx-alert-translator`), the image digests in use, including the third-party OGX sidecar image and its `stack_run_config.yaml` (ConfigMap, `components/triage-agent/templates/stack-run-config.yaml`) and per-agent `knowledge.md` (`components/triage-agent/files/knowledge.md`, mounted via ConfigMap) |
 
 1. **Images by digest.** Same pin convention as §3: `# tag vX.Y.Z, resolved on quay.io on <date>`. A new
    version is a PR here. The OGX sidecar (`docker.io/ogxai/distribution-starter`) follows the same rule
@@ -112,6 +114,17 @@ this repo: this repo only pins their image digests, same as `presidio`.
 4. **Known gap.** The upstream demo's Kubernetes-API MCP server (pod/log/event access) is not part of
    this import; `triage-agent`'s `OCP_MCP_URL` is empty by default. Set `components/triage-agent`'s
    `ocpMcpUrl` value if such a server is deployed separately.
+5. **Alertmanager bridge (`ogx-alert-translator`).** A stateless webhook receiver in
+   `components/ogx-alert-translator` accepts Alertmanager POSTs on `/webhook`, builds a plain-text
+   prompt from the alert labels/annotations, and forwards it to the **existing** triage-agent at
+   `http://triage-agent.<triage-ns>.svc:7860/trigger` (plain JSON `{"input": "<text>"}`). This reuses
+   triage-agent's existing Service port (`7860`, shared with the Gradio UI) — `triage-agent`'s
+   `app.py` mounts Gradio inside a FastAPI app that also serves `/trigger`. **No new Service port
+   and no OGX access** for the translator: it never calls OGX, MCP servers, or the router, and never
+   redefines the system prompt, tool list, or model — that definition lives exactly once, in
+   `triage-agent/agent.py`. Scale-from-zero uses KEDA (`HTTPScaledObject` when the HTTP add-on is
+   installed by Ansible, or optional Prometheus `ScaledObject` in values). No public Route:
+   Alertmanager (or the KEDA HTTP interceptor) calls the cluster Service only.
 
 ## 5. Layout
 
@@ -165,8 +178,10 @@ server-side dry run on a cluster: `oc apply --dry-run=server -n <namespace> -f r
 
 - Operators, CRDs, RBAC, namespaces, cluster-scoped objects → `ansible` repo.
 - Application source code and container builds → `router`, `presidio`, `triage-agent`,
-  `mock-ticketing-system`, `quarkus-buggy-app`, `prometheus-mcp-server` repos. The LiteLLM hook code is
-  developed in `router` and shipped here in a ConfigMap (see §3).
+  `ogx-alert-translator`, `mock-ticketing-system`, `quarkus-buggy-app`, `prometheus-mcp-server` repos.
+  The LiteLLM hook code is developed in `router` and shipped here in a ConfigMap (see §3).
+- KEDA / Custom Metrics Autoscaler operator and HTTP add-on → `ansible` repo (not declared here except
+  as CRs under `components/ogx-alert-translator`).
 
 ## 9. When in doubt
 
