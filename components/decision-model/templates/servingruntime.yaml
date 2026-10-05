@@ -17,6 +17,10 @@ metadata:
   annotations:
     opendatahub.io/runtime-version: {{ $m.runtimeVersion }}
     openshift.io/display-name: {{ $m.runtimeDisplayName }}
+    # The RHOAI dashboard names the runtime from this annotation, then from template-name; without
+    # both it shows "Unknown Serving Runtime". No RHOAI template exists for this preview image, so
+    # there is no template-name.
+    opendatahub.io/template-display-name: {{ $m.runtimeDisplayName }}
     opendatahub.io/recommended-accelerators: '["nvidia.com/gpu"]'
 spec:
   annotations:

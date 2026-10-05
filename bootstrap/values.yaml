@@ -213,7 +213,9 @@ decisionModel:
   # Model name for vLLM and the decision server (label model_name of the vLLM metrics).
   servedModelName: dgemma
   runtime: vllm-structured-read-runtime
-  runtimeDisplayName: vLLM structured-read (preview) with the example decision server
+  # Shown in the RHOAI dashboard. The decision server is the example script of vLLM (see the
+  # component's configmap.yaml).
+  runtimeDisplayName: vLLM structured-read (preview) with the decision server
   # rhaii-preview/vllm-cuda-rhel9:diffusiongemma-jev (linux/amd64), resolved on registry.redhat.io
   # on 2026-09-30. vLLM 0.29.1.dev1248+rhaiv.2.rubin, CUDA 13.0. Unsupported preview.
   runtimeImage: registry.redhat.io/rhaii-preview/vllm-cuda-rhel9@sha256:24fccf947aa33857611efed0d57aead4efc525c78a882760db5229b702713a1a
