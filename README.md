@@ -222,7 +222,9 @@ the agent would stay local. Details: router repo, README "Namespace policy" and
 
 The page `routing-live-view` (Route `routing-live-view-maas-routing.<appsDomain>`, sign-in with the
 cluster users who can list namespaces) shows every decision while it happens, the labels of the demo
-namespaces, and a button that changes a label with the token of the signed-in user.
+namespaces, and a button that changes a label: the page checks first, with the token of the signed-in
+user, that this user may patch the namespace, then its ServiceAccount (allowed on the demo namespaces
+only, ansible repo) writes the label.
 
 ## AI-driven triage demo
 

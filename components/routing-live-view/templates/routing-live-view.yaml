@@ -2,8 +2,9 @@
 {{- $demo := list }}
 {{- range .Values.demoNamespaceRefs }}{{- with index $ns . }}{{- $demo = append $demo . }}{{- end }}{{- end }}
 # ServiceAccount of the page. It reads the router logs (Role below) and the namespace labels
-# (ClusterRole sovereign-selfheal-namespace-reader, bound by the ansible repo: the AppProject
-# allows no cluster-scoped objects). The annotation lets oauth-proxy use it as OAuth client.
+# (ClusterRole sovereign-selfheal-namespace-reader), and patches the label of the demo namespaces
+# only (ClusterRole sovereign-selfheal-demo-namespace-labeler); the ansible repo binds both: the
+# AppProject allows no cluster-scoped objects. The annotation lets oauth-proxy use it as OAuth client.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -135,7 +136,10 @@ spec:
             seccompProfile:
               type: RuntimeDefault
         # Sign-in with the OpenShift users. It passes the user's token to the app
-        # (X-Forwarded-Access-Token): a label change runs with the RBAC of that user.
+        # (X-Forwarded-Access-Token). A ServiceAccount OAuth client gets only user:info and
+        # user:check-access (OpenShift refuses user:full): the app checks with that token whether
+        # the user may patch the namespace (SelfSubjectAccessReview), then writes with its own
+        # ServiceAccount (patch on the demo namespaces only, ansible repo).
         - name: oauth-proxy
           image: {{ .Values.oauthProxyImage }}
           imagePullPolicy: IfNotPresent
@@ -152,7 +156,7 @@ spec:
             - --openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
             - --openshift-sar={{ .Values.accessCheck }}
             - --pass-access-token=true
-            - --scope=user:full
+            - --scope=user:info user:check-access
           ports:
             - name: https
               containerPort: 8443
