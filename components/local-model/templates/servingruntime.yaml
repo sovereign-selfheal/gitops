@@ -10,6 +10,9 @@ metadata:
     opendatahub.io/runtime-version: {{ $m.runtimeVersion }}
     opendatahub.io/template-name: {{ $m.runtimeTemplate }}
     openshift.io/display-name: {{ $m.runtimeDisplayName }}
+    # The RHOAI dashboard names the runtime from this annotation, then from template-name (it sets
+    # both when it deploys a runtime from the template).
+    opendatahub.io/template-display-name: {{ $m.runtimeDisplayName }}
     {{- if gt (int $m.gpu) 0 }}
     opendatahub.io/recommended-accelerators: '["nvidia.com/gpu"]'
     {{- end }}
