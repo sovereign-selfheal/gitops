@@ -34,6 +34,7 @@ Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/obser
 | `litellm-router` | `maas-routing` | 2 | ConfigMap (config + hook code + policies), Deployment (2 replicas), PodDisruptionBudget, Service (API port 80, metrics 9091), ServiceMonitor, NetworkPolicy (4000 from the gateway, 9091 from monitoring), Perses dashboards `sovereign-at-a-glance` (audience), `routing-decisions` (demo) and `stack-operations` (team) and their datasources (only with `observability.enabled`) |
 | `frontdoor` | `maas-routing` | 3 | HTTPRoute, AuthPolicy (API key; refuses `/metrics`), TokenRateLimitPolicy (POST requests only) |
 | `quarkus-buggy-app` | `agentic-triage` | 1 | Deployment, Service, ServiceMonitor, Route (target of the triage demo, injects random 500s/503s/latency) |
+| `routing-live-view` | `maas-routing` | 5 | Live page of the routing decisions and of the namespace labels (repo `routing-live-view`): Deployment with the OpenShift oauth-proxy, Service, Route (reencrypt), ServiceAccount, Role to read the LiteLLM logs, cookie secret (ESO generator). See "Namespace policy" |
 | `quarkus-buggy-app-restricted` | `payments` | 1 | The same chart (`chart: quarkus-buggy-app`) in the namespace labelled `restricted`: the agent investigates it with the local model only (see "Namespace policy") |
 | `ticketing-system` | `agentic-triage` | 1 | Deployment (1 replica, SQLite on a PVC), Service, Route (incident dashboard) |
 | `prometheus-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to `cluster-monitoring-view`) |
@@ -218,6 +219,10 @@ The alert `QuarkusBuggyAppHighErrorRate` exists once per namespace with a quarku
 of the alert. Do not write a restricted namespace in a fixed prompt: with the scan on, every request of
 the agent would stay local. Details: router repo, README "Namespace policy" and
 `docs/namespace-policy.md` (the contract for agents).
+
+The page `routing-live-view` (Route `routing-live-view-maas-routing.<appsDomain>`, sign-in with the
+cluster users who can list namespaces) shows every decision while it happens, the labels of the demo
+namespaces, and a button that changes a label with the token of the signed-in user.
 
 ## AI-driven triage demo
 

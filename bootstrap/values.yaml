@@ -351,3 +351,9 @@ components:
     # After triage-agent: forwards Alertmanager webhooks to triage-agent's /trigger on :7860.
     wave: 5
     namespaceRef: triage
+  # Live page of the routing decisions and of the namespace labels (repo routing-live-view),
+  # behind the OpenShift oauth-proxy. Reads the LiteLLM logs, so it lives next to the router.
+  routing-live-view:
+    enabled: true
+    wave: 5
+    namespaceRef: router

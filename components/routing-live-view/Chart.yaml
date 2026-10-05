@@ -1,0 +1,7 @@
+apiVersion: v2
+name: routing-live-view
+description: >-
+  Live page of the routing decisions of the router and of the namespace labels of the demo
+  (repo routing-live-view), behind the OpenShift oauth-proxy.
+type: application
+version: 0.1.0
