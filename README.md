@@ -34,6 +34,7 @@ Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/obser
 | `litellm-router` | `maas-routing` | 2 | ConfigMap (config + hook code + policies), Deployment (2 replicas), PodDisruptionBudget, Service (API port 80, metrics 9091), ServiceMonitor, NetworkPolicy (4000 from the gateway, 9091 from monitoring), Perses dashboards `sovereign-at-a-glance` (audience), `routing-decisions` (demo) and `stack-operations` (team) and their datasources (only with `observability.enabled`) |
 | `frontdoor` | `maas-routing` | 3 | HTTPRoute, AuthPolicy (API key; refuses `/metrics`), TokenRateLimitPolicy (POST requests only) |
 | `quarkus-buggy-app` | `agentic-triage` | 1 | Deployment, Service, ServiceMonitor, Route (target of the triage demo, injects random 500s/503s/latency) |
+| `quarkus-buggy-app-restricted` | `payments` | 1 | The same chart (`chart: quarkus-buggy-app`) in the namespace labelled `restricted`: the agent investigates it with the local model only (see "Namespace policy") |
 | `ticketing-system` | `agentic-triage` | 1 | Deployment (1 replica, SQLite on a PVC), Service, Route (incident dashboard) |
 | `prometheus-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to `cluster-monitoring-view`) |
 | `ticketing-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR |
@@ -68,6 +69,8 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 | `classifier.mode` | `local` | C2 classifier of the privacy gate: `local` (the local model), `external`, `off` (see below) |
 | `observability.enabled` | `true` | `false`: no Tempo, no collector, no traces (see "Observability") |
 | `decisionModel.enabled` | `false` | `true`: the decision model on its own GPU node (see "Decision model"); needs `modelProfile: gpu` |
+| `namespacePolicy.scan` | `false` | `true`: the router finds namespace names in the request text (router v0.11.0, see "Namespace policy") |
+| `namespacePolicy.hint` | `false` | `true`: the router reads the namespaces that the agents send, and triage-agent sends them |
 
 ## Observability
 
@@ -188,6 +191,33 @@ repo. Without them the seed sets `sota.enabled: false`, and the router runs in *
 the alias `sota-smart` points to the local model, so the gates and policies work as usual, but every
 request is served by the local model. The router logs still show `routed_to: sota-smart` when a gate
 chooses "SOTA".
+
+## Namespace policy
+
+Since router v0.11.0 a request about a namespace labelled `sovereign-selfheal.io/data-class=restricted`
+stays on the local model, before the gates. No label or `public` keeps the normal routing. The ansible
+repo creates the namespaces with their labels (`agentic-triage`: `public`, `payments`: `restricted`) and
+gives the ServiceAccount `maas-routing/litellm` get/list/watch on namespaces. A label can change live:
+
+```bash
+oc label namespace payments sovereign-selfheal.io/data-class=public --overwrite
+```
+
+The router reads the labels again every 5 seconds (`refresh_s` in `chain.yaml`). Two switches of the root
+Application turn the policy on, both off by default:
+
+- `namespacePolicy.scan`: the router finds the namespace names in the request text (PromQL
+  `namespace="payments"`, JSON and YAML `namespace` keys, `payments.svc`, `-n payments`).
+- `namespacePolicy.hint`: the router reads the body field `selfheal_namespaces` that the agents send,
+  and triage-agent sends it (env `ROUTER_NAMESPACE_HINT`; needs a triage-agent version with
+  `namespaces` in `/trigger`). The field is removed before any model call.
+
+The alert `QuarkusBuggyAppHighErrorRate` exists once per namespace with a quarkus-buggy-app
+(`alerts.quarkusBuggyApp.namespaceRefs` of the observability component) and keeps the `namespace` label
+(`sum by (namespace)`). The knowledge file of triage-agent names no namespace: the agent uses the one
+of the alert. Do not write a restricted namespace in a fixed prompt: with the scan on, every request of
+the agent would stay local. Details: router repo, README "Namespace policy" and
+`docs/namespace-policy.md` (the contract for agents).
 
 ## AI-driven triage demo
 

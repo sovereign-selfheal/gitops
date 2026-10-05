@@ -47,3 +47,8 @@ alerts:
     for: 5m
     severity: warning
     service: quarkus-buggy-app
+    # Namespaces with a quarkus-buggy-app instance (keys of global.namespaces). A key without a
+    # namespace in global.namespaces is skipped.
+    namespaceRefs:
+      - triage
+      - triageRestricted

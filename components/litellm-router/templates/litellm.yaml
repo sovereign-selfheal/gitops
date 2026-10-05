@@ -20,6 +20,9 @@ spec:
         # read only at start.
         secret-store/enabled: {{ dig "secretStore" "enabled" false .Values.global | quote }}
     spec:
+      # Own ServiceAccount: with the namespace policy on, the hook reads the namespace labels
+      # (get/list/watch on namespaces, bound by the ansible repo to maas-routing/litellm).
+      serviceAccountName: litellm
       # Prefer one replica per node. "Preferred": it never blocks scheduling.
       affinity:
         podAntiAffinity:
@@ -102,6 +105,17 @@ spec:
             # (router v0.6.0 or later; a model without this switch ignores it).
             - name: CLASSIFIER_CHAT_TEMPLATE_KWARGS
               value: '{"enable_thinking": false}'
+            {{- end }}
+            {{- $np := .Values.global.namespacePolicy | default dict }}
+            {{- if $np.scan }}
+            # Namespace policy (router v0.11.0): find namespace names in the request text.
+            - name: NAMESPACE_SCAN_ENABLED
+              value: "1"
+            {{- end }}
+            {{- if $np.hint }}
+            # Namespace policy (router v0.11.0): read the names that the agents send.
+            - name: NAMESPACE_HINT_ENABLED
+              value: "1"
             {{- end }}
             {{- with .Values.global.sota.servedMatch }}
             # Overrides sota_served_match in chain.yaml (cost gate).
