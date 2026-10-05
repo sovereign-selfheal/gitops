@@ -1,7 +1,7 @@
 apiVersion: v2
 name: ogx-alert-translator
 description: >-
-  Alertmanager webhook bridge that forwards firing alerts to the triage-agent OGX
-  Responses API. Scales from zero with KEDA HTTP add-on when enabled.
+  Alertmanager webhook bridge that forwards firing alerts to the /trigger endpoint of
+  triage-agent. Scales from zero with the KEDA HTTP add-on when enabled.
 type: application
 version: 0.1.0

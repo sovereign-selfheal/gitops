@@ -12,7 +12,12 @@ metadata:
   labels:
     app: ogx-alert-translator
 spec:
+  {{- /* No replicas when KEDA scales the Deployment: Argo CD (selfHeal) would set the value
+         in Git again and stop the pod that KEDA started (seen on 2026-10-05: the pod stopped
+         20 s after the scale from zero, KEDA's scaledownPeriod is 300 s). */}}
+  {{- if not (or .Values.keda.httpAddon.enabled .Values.keda.prometheus.enabled) }}
   replicas: {{ .Values.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       app: ogx-alert-translator

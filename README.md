@@ -38,6 +38,7 @@ Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/obser
 | `prometheus-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to `cluster-monitoring-view`) |
 | `ticketing-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR |
 | `triage-agent` | `agentic-triage` | 4 | ServiceAccount, own tier `ExternalSecret`, Deployment, Service, Route (Gradio chat UI) |
+| `ogx-alert-translator` | `agentic-triage` | 5 | ServiceAccount, Deployment (KEDA owns the replicas), Service, `HTTPScaledObject` (KEDA HTTP add-on, 0 to 3 pods): Alertmanager webhook bridge to the `/trigger` endpoint of triage-agent |
 
 Presidio and LiteLLM run 2 replicas each (value `replicas` of the component), so one pod or node can
 fail without stopping the router. A preferred pod anti-affinity puts the replicas on different nodes
@@ -206,6 +207,11 @@ triage-agent (Gradio UI) ──> OGX sidecar (server-side agentic loop, same pod
   too. Source and images: `triage-agent`, `mock-ticketing-system`, `quarkus-buggy-app`,
   `prometheus-mcp-server` repos (see `AGENTS.md` §4); the OGX sidecar image itself is a third-party image
   (`ogxai/distribution-starter`), pinned by digest in `gitops` only, not built by any of those repos.
+- **`ogx-alert-translator`**: an Alertmanager webhook bridge (`/webhook`). It turns the alert into a
+  prompt and calls the `/trigger` endpoint of triage-agent, which runs the agent in the background. It
+  scales from zero with the KEDA HTTP add-on, so senders POST to the interceptor
+  (`keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080`, see `AGENTS.md` §4). No Alertmanager
+  receiver sends alerts to it yet.
 
 Try the demo prompts from the chat UI's Route, or open an incident manually against the ticketing
 system's `/api/incidents` endpoint and ask the agent to investigate it.
