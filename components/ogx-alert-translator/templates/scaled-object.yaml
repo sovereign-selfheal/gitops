@@ -6,6 +6,9 @@ metadata:
   labels:
     app: ogx-alert-translator
 spec:
+  # Empty: the interceptor routes the requests of every Host to this app (HTTP add-on 0.14 or
+  # later; the one of Custom Metrics Autoscaler 2.19.0 does, checked on 2026-10-05). Give
+  # explicit hosts when another HTTPScaledObject shares the interceptor.
   hosts: []
   targetPendingRequests: {{ .Values.keda.httpAddon.targetPendingRequests }}
   scaleTargetRef:

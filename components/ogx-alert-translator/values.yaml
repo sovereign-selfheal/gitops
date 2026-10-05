@@ -5,9 +5,10 @@ global:
     triage: agentic-triage
 
 # Image of the ogx-alert-translator repo (github.com/sovereign-selfheal/ogx-alert-translator).
-# Update the digest after the first Quay tag build (same pin convention as other components).
-# tag v0.1.0, pending first resolve on quay.io on 2026-10-04
-image: quay.io/sovereign-selfheal/ogx-alert-translator:v0.1.0
+# tag v0.1.0, resolved on quay.io on 2026-10-05
+image: quay.io/sovereign-selfheal/ogx-alert-translator@sha256:b019e5b342d0068c7a86f47952f64f329690db2d49b9ad47af7e1f5ec96817de
+# Used only when KEDA is off (keda.httpAddon.enabled and keda.prometheus.enabled false). With
+# KEDA the Deployment has no replicas field: KEDA owns the number of pods.
 replicas: 0
 
 keda:

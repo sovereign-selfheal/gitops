@@ -15,7 +15,7 @@ here. After that, Argo CD owns every object described in this repo.
 
 | Owner | Objects |
 |---|---|
-| `ansible` | Operators (including the RHOAI **MCP lifecycle operator**, needed for the `MCPServer` CRs of `components/prometheus-mcp-server` and `components/ticketing-mcp-server`), DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, the metric monitors of Limitador and Authorino, the `TelemetryPolicy` `openshift-ai-inference-labels` (label `tier` on the Limitador counters, read from the `tier` filter of the AuthPolicy `litellm-apikey`: rename both together), GPU nodes, the namespaces `local-models`, `maas-routing` and `agentic-triage`, the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), the model image pre-pull DaemonSets (namespace `sovereign-selfheal-prepull`), the `ClusterRoleBinding` of the `prometheus-mcp-server-sa` ServiceAccount (namespace `agentic-triage`) to the built-in `cluster-monitoring-view` ClusterRole, Argo CD settings, the root Application, the observability operators (OpenTelemetry, Tempo, Cluster Observability), the `UIPlugin` `distributed-tracing`, the Tempo tenant write permission (ClusterRole + binding), the namespace `observability`, user workload monitoring, team access when `team_users` is set (Keycloak in `keycloak` when Ansible installs it, OAuth IdP, `Group/selfheal-team` + ClusterRoleBinding, the Argo CD RBAC line `g, selfheal-team, role:admin`) |
+| `ansible` | Operators (including the RHOAI **MCP lifecycle operator**, needed for the `MCPServer` CRs of `components/prometheus-mcp-server` and `components/ticketing-mcp-server`, and the **Custom Metrics Autoscaler** (KEDA) with its `KedaController` and HTTP add-on, needed for the `HTTPScaledObject` of `components/ogx-alert-translator`), DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, the metric monitors of Limitador and Authorino, the `TelemetryPolicy` `openshift-ai-inference-labels` (label `tier` on the Limitador counters, read from the `tier` filter of the AuthPolicy `litellm-apikey`: rename both together), GPU nodes, the namespaces `local-models`, `maas-routing` and `agentic-triage`, the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), the model image pre-pull DaemonSets (namespace `sovereign-selfheal-prepull`), the `ClusterRoleBinding` of the `prometheus-mcp-server-sa` ServiceAccount (namespace `agentic-triage`) to the built-in `cluster-monitoring-view` ClusterRole, Argo CD settings, the root Application, the observability operators (OpenTelemetry, Tempo, Cluster Observability), the `UIPlugin` `distributed-tracing`, the Tempo tenant write permission (ClusterRole + binding), the namespace `observability`, user workload monitoring, team access when `team_users` is set (Keycloak in `keycloak` when Ansible installs it, OAuth IdP, `Group/selfheal-team` + ClusterRoleBinding, the Argo CD RBAC line `g, selfheal-team, role:admin`) |
 | `gitops` (this repo) | Every object inside `local-models`, `maas-routing`, `observability` and `agentic-triage` |
 
 - **Namespaces** are created by Ansible with the label `argocd.argoproj.io/managed-by: openshift-gitops`.
@@ -92,7 +92,7 @@ none of them has a code-copy contract with this repo: this repo only pins their 
 | Owner | Items |
 |---|---|
 | `triage-agent` | Gradio UI (`app.py`, `agent.py`), a thin client of the OGX sidecar's Responses API, image `quay.io/sovereign-selfheal/triage-agent` |
-| `ogx-alert-translator` | FastAPI Alertmanager webhook bridge to triage-agent OGX (`POST /v1/responses`), image `quay.io/sovereign-selfheal/ogx-alert-translator` |
+| `ogx-alert-translator` | FastAPI Alertmanager webhook bridge to the `/trigger` endpoint of triage-agent (see point 5), image `quay.io/sovereign-selfheal/ogx-alert-translator` |
 | `mock-ticketing-system` | Two subfolders, two images: `ticketing-system` (FastAPI ServiceNow simulator) and `ticketing-mcp-server` (FastMCP wrapper), `quay.io/sovereign-selfheal/ticketing-system` and `quay.io/sovereign-selfheal/ticketing-mcp-server` |
 | `quarkus-buggy-app` | Quarkus 3 source, built with the Jib extension, image `quay.io/sovereign-selfheal/quarkus-buggy-app` |
 | `prometheus-mcp-server` | FastMCP server wrapping PromQL against Thanos, image `quay.io/sovereign-selfheal/prometheus-mcp-server` |
@@ -123,8 +123,16 @@ none of them has a code-copy contract with this repo: this repo only pins their 
    and no OGX access** for the translator: it never calls OGX, MCP servers, or the router, and never
    redefines the system prompt, tool list, or model — that definition lives exactly once, in
    `triage-agent/agent.py`. Scale-from-zero uses KEDA (`HTTPScaledObject` when the HTTP add-on is
-   installed by Ansible, or optional Prometheus `ScaledObject` in values). No public Route:
-   Alertmanager (or the KEDA HTTP interceptor) calls the cluster Service only.
+   installed by Ansible, or optional Prometheus `ScaledObject` in values). No public Route.
+   - **Callers use the interceptor.** With the HTTP add-on, a sender (Alertmanager) must POST to
+     `http://keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080/webhook`: the interceptor
+     holds the request and KEDA starts the pod. The Service of the translator has no endpoints while
+     it is scaled to zero. Checked on 2026-10-05: HTTP 202 after a 26 s cold start, and triage-agent
+     started its run.
+   - **No `replicas` with KEDA.** With KEDA on, the Deployment has no `replicas` field: KEDA owns the
+     number of pods. With a value in Git, Argo CD (selfHeal) sets it again and stops the pod that KEDA
+     started.
+   - **Known gap.** No Alertmanager receiver sends alerts to the bridge yet.
 
 ## 5. Layout
 

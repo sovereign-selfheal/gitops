@@ -323,6 +323,6 @@ components:
     namespaceRef: triage
   ogx-alert-translator:
     enabled: true
-    # After triage-agent: forwards Alertmanager webhooks to triage-agent OGX on :8321.
+    # After triage-agent: forwards Alertmanager webhooks to triage-agent's /trigger on :7860.
     wave: 5
     namespaceRef: triage
