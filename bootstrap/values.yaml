@@ -39,6 +39,9 @@ namespaces:
   observability: observability
   # AI-driven triage demo (quarkus-buggy-app, ticketing-system, both MCP servers, triage-agent).
   triage: agentic-triage
+  # Second quarkus-buggy-app, in a namespace labelled sovereign-selfheal.io/data-class=restricted
+  # by the ansible repo: the agent investigates it with the local model only (namespacePolicy).
+  triageRestricted: payments
 
 # ----- Observability (traces of the router) --------------------------------------
 # Set by the seed from observability_enabled. true: component observability (Tempo and the
@@ -204,6 +207,19 @@ localModel:
 # SUPPORT STATUS: unsupported preview image, for prototypes and proofs of concept. The example
 # decision server is planned as Developer Preview in Red Hat AI Inference Server 3.6 GA and as
 # Technology Preview in 3.7 EA1 (3.7 GA: path to general availability). Its API may change.
+# ----- Namespace policy (router v0.11.0) -------------------------------------------
+# A request about a namespace labelled sovereign-selfheal.io/data-class=restricted (set by the
+# ansible repo) stays on the local model, before the gates. No label or "public" keeps the normal
+# routing. Two switches, both off by default (set by the seed):
+#   scan: the router finds namespace names in the request text (PromQL, JSON, x.svc, -n x);
+#   hint: the router reads the names that the agents send (body field selfheal_namespaces), and
+#         triage-agent sends them (env ROUTER_NAMESPACE_HINT, triage-agent with /trigger namespaces).
+# The ServiceAccount litellm reads the namespace labels: the ansible repo gives it get/list/watch
+# on namespaces. See the router repo, README "Namespace policy".
+namespacePolicy:
+  scan: false
+  hint: false
+
 decisionModel:
   # Set by the seed (decision_model_enabled of the ansible repo).
   enabled: false
@@ -306,6 +322,13 @@ components:
     enabled: true
     wave: 1
     namespaceRef: triage
+  # The same chart (key `chart`) in the restricted namespace: the agent investigates this one
+  # with the local model only (namespacePolicy).
+  quarkus-buggy-app-restricted:
+    enabled: true
+    chart: quarkus-buggy-app
+    wave: 1
+    namespaceRef: triageRestricted
   ticketing-system:
     enabled: true
     wave: 1

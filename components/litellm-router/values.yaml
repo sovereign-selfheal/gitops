@@ -26,6 +26,9 @@ global:
   observability:
     enabled: true
     otlpEndpoint: http://otel-collector.observability.svc:4318
+  namespacePolicy:
+    scan: false
+    hint: false
 
 # Version (git tag) of the router repo (github.com/sovereign-selfheal/router). The hook
 # code in files/*.py is a copy of that repo at this tag, and the image below must come

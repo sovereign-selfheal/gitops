@@ -21,7 +21,8 @@ spec:
   source:
     repoURL: {{ $.Values.repo.url }}
     targetRevision: {{ $.Values.repo.targetRevision }}
-    path: components/{{ $name }}
+    # `chart` deploys the same component twice (for example quarkus-buggy-app-restricted).
+    path: components/{{ $c.chart | default $name }}
     helm:
       valuesObject:
         global:
