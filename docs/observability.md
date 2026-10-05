@@ -97,6 +97,8 @@ litellm-router: <proxy request span>             (LiteLLM, one per HTTP request)
 - The first gate that says LOCAL ends the chain: a short question has only `gate.efficiency`.
 - `privacy.signals` shows what the privacy engine found, for example `credit_card:0.85` or
   `PERSON@0.85(<2 words):0.00` (found but not counted).
+- With the decision model, Presidio NER is off (`NER_ENABLED=0`, router v0.10.0): no
+  `presidio.analyze` span, and `privacy.signals` has no NER entities.
 - An error (for example Presidio down) marks its span as failed; the request stays LOCAL
   (fail-closed), and the trace shows why.
 - The LLM call is a sibling of `router.chain`, not a child: LiteLLM creates it under the proxy span.

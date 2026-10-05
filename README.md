@@ -130,6 +130,12 @@ prompt is treated as sensitive and stays on the local model. With the decision m
 first falls back to Qwen3.8; only when that fails too, the prompt stays local. The log reason names the
 backend that decided: `systemone/llm@0.93(legal)` (router v0.9.0 names the question) or `fallback/llm@0.90`.
 
+With the decision model, Presidio NER (C1) is off: the LiteLLM Deployment sets `NER_ENABLED=0` (router
+v0.10.0). On agent contexts Presidio read technical names as people or places, and benign requests stayed
+local; the decision model questions (`person`, `family`, `health`...) catch the personal data. The rules
+(regex, lexicons) still run. Presidio stays deployed, and the policy keeps `ner.enabled: true` for the
+setups without the decision model.
+
 ## Decision model
 
 With `decisionModel.enabled` the demo gets a second local model, with one job: typed decisions.
