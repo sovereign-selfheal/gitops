@@ -132,6 +132,11 @@ lexicons:
 # Presidio does NOT model is handled per `on_unsupported` (skip -> rely on A+B, which
 # are bilingual/deterministic). This removes the English-model-on-Italian false
 # positive (e.g. "ciao" -> PERSON).
+#
+# With decisionModel.enabled the LiteLLM Deployment sets NER_ENABLED=0 (router >= v0.10.0),
+# which overrides `enabled` below: C1 is off, and A, B and the decision model (C2) decide.
+# On agent contexts Presidio read technical names as people or places, and benign requests
+# stayed LOCAL. Presidio stays deployed.
 ner:
   enabled: true
   url: http://presidio-analyzer.maas-routing.svc.cluster.local:3000/analyze

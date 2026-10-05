@@ -30,7 +30,7 @@ global:
 # Version (git tag) of the router repo (github.com/sovereign-selfheal/router). The hook
 # code in files/*.py is a copy of that repo at this tag, and the image below must come
 # from the same tag. scripts/sync-router-code.sh sets it and checks the copy (CI).
-routerVersion: v0.9.0
+routerVersion: v0.10.0
 # Image of the router repo: LiteLLM v1.102.0 + fastText language ID model.
 # tag v0.9.0, resolved on quay.io on 2026-10-03 (same image as v0.3.0 to v0.8.0: the Containerfile
 # did not change; it already has opentelemetry and prometheus_client)

@@ -83,6 +83,12 @@ spec:
               value: {{ $qwenUrl | quote }}
             - name: CLASSIFIER_FALLBACK_MODEL
               value: {{ .Values.global.localModel.name | quote }}
+            # C1 (Presidio NER) off with the decision model (router v0.10.0). On agent contexts
+            # Presidio read technical names as people or places, and benign requests stayed LOCAL;
+            # the decision model questions (person, family, health...) catch the personal data.
+            # Presidio stays deployed. See README "Privacy classifier (C2)".
+            - name: NER_ENABLED
+              value: "0"
             {{- else }}
             - name: CLASSIFIER_BASE_URL
               value: {{ $qwenUrl | quote }}
