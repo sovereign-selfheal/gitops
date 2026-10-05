@@ -245,7 +245,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: Restricted requests kept in the cluster
+            name: Restricted kept in the cluster
             description: Requests about a restricted namespace, answered by the local model before the gates
           plugin:
             kind: StatChart
@@ -253,7 +253,7 @@ spec:
               calculation: last-number
               format: {unit: decimal, decimalPlaces: 0}
               colorMode: background_solid
-              thresholds: {defaultColor: "#a30000", steps: []}
+              thresholds: {defaultColor: "#3e8635", steps: []}
           queries:
             - kind: TimeSeriesQuery
               spec:
