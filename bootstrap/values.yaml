@@ -199,18 +199,11 @@ localModel:
         displayName: CPU only (vLLM CPU)
         description: CPU and memory only, no GPU.
 
-# ----- Decision model (component decision-model) ----------------------------------
-# DiffusionGemma 26B-A4B FP8-dynamic served by the vLLM structured-read mode, behind the example
-# decision server of vLLM (/v1/systemone: typed questions, one probability per answer from one
-# forward pass). It runs on its own GPU node (gpu-decision pool of the ansible repo, one NVIDIA
-# L40S on a g6e.2xlarge). Qwen3.8 is not changed.
-# SUPPORT STATUS: unsupported preview image, for prototypes and proofs of concept. The example
-# decision server is planned as Developer Preview in Red Hat AI Inference Server 3.6 GA and as
-# Technology Preview in 3.7 EA1 (3.7 GA: path to general availability). Its API may change.
 # ----- Namespace policy (router v0.11.0) -------------------------------------------
 # A request about a namespace labelled sovereign-selfheal.io/data-class=restricted (set by the
 # ansible repo) stays on the local model, before the gates. No label or "public" keeps the normal
-# routing. Two switches, both off by default (set by the seed):
+# routing. Two switches, off in this file; the ansible seed sets them (its defaults: scan on,
+# hint off):
 #   scan: the router finds namespace names in the request text (PromQL, JSON, x.svc, -n x);
 #   hint: the router reads the names that the agents send (body field selfheal_namespaces), and
 #         triage-agent sends them (env ROUTER_NAMESPACE_HINT, triage-agent with /trigger namespaces).
@@ -220,6 +213,14 @@ namespacePolicy:
   scan: false
   hint: false
 
+# ----- Decision model (component decision-model) ----------------------------------
+# DiffusionGemma 26B-A4B FP8-dynamic served by the vLLM structured-read mode, behind the example
+# decision server of vLLM (/v1/systemone: typed questions, one probability per answer from one
+# forward pass). It runs on its own GPU node (gpu-decision pool of the ansible repo, one NVIDIA
+# L40S on a g6e.2xlarge). Qwen3.8 is not changed.
+# SUPPORT STATUS: unsupported preview image, for prototypes and proofs of concept. The example
+# decision server is planned as Developer Preview in Red Hat AI Inference Server 3.6 GA and as
+# Technology Preview in 3.7 EA1 (3.7 GA: path to general availability). Its API may change.
 decisionModel:
   # Set by the seed (decision_model_enabled of the ansible repo).
   enabled: false

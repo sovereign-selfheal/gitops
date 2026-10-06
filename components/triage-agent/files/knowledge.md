@@ -3,7 +3,7 @@
 ## Overview
 
 **Application name:** `quarkus-buggy-app`  
-**Namespace:** one instance per namespace. Use the namespace of the alert (label `namespace`) or of the question, and put it in place of `<namespace>` in every query and command below. Never assume a default namespace.  
+**Namespace:** one instance per namespace. Use the namespace of the alert (label `namespace`) or the one named in the question, and put it in place of `<namespace>` in every query and command below. Only when neither gives a namespace, use `agentic-triage` (the default instance of the demo).  
 **Technology:** Quarkus 3.8 (Java), RESTEasy Reactive, Micrometer + Prometheus metrics, SmallRye Health  
 **Purpose:** A deliberately broken demo application used to showcase AI-driven troubleshooting. It intentionally injects failures to simulate real-world incidents.
 
