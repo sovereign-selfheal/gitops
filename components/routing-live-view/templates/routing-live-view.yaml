@@ -114,6 +114,15 @@ spec:
               value: {{ .Values.global.localModel.displayName | default "Local model" | quote }}
             - name: SOTA_MODEL_LABEL
               value: {{ ternary (regexReplaceAll "^[^/]+/" (.Values.global.sota.model | default "") "") "off (local-only mode)" (and .Values.global.sota.enabled (ne (.Values.global.sota.model | default "") "")) | quote }}
+            # Column Agent: name of the agent of each API-key tier (global.tiers[].agent).
+            {{- $agents := dict }}
+            {{- range .Values.global.tiers }}
+            {{- if .agent }}
+            {{- $_ := set $agents .name .agent }}
+            {{- end }}
+            {{- end }}
+            - name: TIER_LABELS
+              value: {{ toJson $agents | quote }}
             - name: NAMESPACE_POLL_SECONDS
               value: {{ .Values.namespacePollSeconds | quote }}
           readinessProbe:

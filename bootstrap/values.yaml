@@ -95,6 +95,8 @@ classifier:
 #             20k tokens is about 5 long answers or 10 agent calls of 2k; answers sent one
 #             after the other (about 50 s each) add up in the window, and after a 429 the
 #             tier opens again within 5 minutes (a demo scene can be repeated soon).
+# agent (optional): name of the agent that uses the tier, shown in the column Agent of the live page
+# routing-live-view (env TIER_LABELS); a tier without it shows as "<tier> key".
 # sotaTokens (router v0.12.0, only with sotaBudget.enabled): SOTA tokens of the tier per
 # sotaBudget window. When the tier used them, the router sends its requests to the local model
 # (no 429; the agent goes on). Keep it below `tokens`: the gateway limit stays the ceiling. No
@@ -112,6 +114,7 @@ tiers:
   # (5 calls, measured on ocp.8mqfl on 2026-10-06), so 30k SOTA tokens are about 3
   # investigations in 5 minutes, then local.
   - name: agents
+    agent: triage-agent
     tokens: 200000
     window: 5m
     sotaTokens: 30000
