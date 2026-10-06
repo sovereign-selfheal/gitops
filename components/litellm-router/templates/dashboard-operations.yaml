@@ -5,6 +5,13 @@
 {{- $gpu := eq .Values.global.modelProfile "gpu" }}
 {{- $dm := .Values.global.decisionModel | default dict }}
 {{- $decision := and $gpu $dm.enabled }}
+{{- $sb := .Values.global.sotaBudget | default dict }}
+{{- $sotaTiers := list }}
+{{- if $sb.enabled }}
+{{- range .Values.global.tiers }}{{ if .sotaTokens }}{{ $sotaTiers = append $sotaTiers . }}{{ end }}{{ end }}
+{{- end }}
+{{- $ws := int ($sb.windowSeconds | default 300) }}
+{{- $sbWindow := ternary (printf "%dm" (div $ws 60)) (printf "%ds" $ws) (eq (mod $ws 60) 0) }}
 # Perses dashboard for the team (Observe -> Dashboards, project {{ $ns }}): the router per pod,
 # the local model and its GPU, the token budgets of the gateway. The demo view is the dashboard
 # routing-decisions. Same datasource (router-prometheus, Thanos): the queries read the metrics of
@@ -95,6 +102,19 @@ spec:
             - {x: 0, "y": 6, width: 12, height: 8, content: {$ref: "#/spec/panels/tierTokens"}}
             - {x: 12, "y": 6, width: 6, height: 8, content: {$ref: "#/spec/panels/tierLimited"}}
             - {x: 18, "y": 6, width: 6, height: 8, content: {$ref: "#/spec/panels/authStatus"}}
+      {{- if $sotaTiers }}
+      - kind: Grid
+        spec:
+          display:
+            title: {{ printf "SOTA budget per tier (router, namespace %s)" $ns | quote }}
+          items:
+            {{- $sw := div 24 (max 1 (len $sotaTiers)) }}
+            {{- range $i, $t := $sotaTiers }}
+            - {x: {{ mul $i $sw }}, "y": 0, width: {{ $sw }}, height: 6, content: {$ref: {{ printf "#/spec/panels/sotaBudget_%s" $t.name | quote }}}}
+            {{- end }}
+            - {x: 0, "y": 6, width: 12, height: 8, content: {$ref: "#/spec/panels/sotaTokens"}}
+            - {x: 12, "y": 6, width: 12, height: 8, content: {$ref: "#/spec/panels/sotaBudgetStore"}}
+      {{- end }}
       - kind: Grid
         spec:
           display:
@@ -422,6 +442,75 @@ spec:
                     datasource: {kind: PrometheusDatasource, name: router-prometheus}
                     query: {{ printf "sum(increase(authorized_hits{namespace=%q,tier=%q}[%s])) or vector(0)" $kuadrant $t.name $t.window | quote }}
                     seriesNameFormat: {{ printf "%s tokens" $t.name | quote }}
+      {{- end }}
+      {{- range $t := $sotaTiers }}
+      sotaBudget_{{ $t.name }}:
+        kind: Panel
+        spec:
+          display:
+            name: {{ printf "Tier %s: SOTA tokens in the last %s (budget %v)" $t.name $sbWindow $t.sotaTokens | quote }}
+            description: Tokens of the SOTA answers of the tier, from the router counters. At the budget the router sends the requests of the tier to the local model (no 429).
+          plugin:
+            kind: GaugeChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              max: {{ $t.sotaTokens }}
+              thresholds:
+                steps:
+                  - {value: {{ div (mul $t.sotaTokens 7) 10 }}, color: "#f0ab00"}
+                  - {value: {{ div (mul $t.sotaTokens 9) 10 }}, color: "#c9190b"}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(increase(router_sota_tokens_total{namespace=%q,team=%q}[%s])) or vector(0)" $ns $t.name $sbWindow | quote }}
+                    seriesNameFormat: {{ printf "%s SOTA tokens" $t.name | quote }}
+      {{- end }}
+      {{- if $sotaTiers }}
+      sotaTokens:
+        kind: Panel
+        spec:
+          display:
+            name: SOTA tokens per minute, by tier
+            description: Tokens of the answers of the SOTA model (fallbacks to the local model and the local-only mode do not count)
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: right, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 0}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (team) (rate(router_sota_tokens_total{namespace=%q}[$__rate_interval])) * 60" $ns | quote }}
+                    seriesNameFormat: {{ "{{team}}" | quote }}
+      sotaBudgetStore:
+        kind: Panel
+        spec:
+          display:
+            name: Budget store (Redis) errors per minute
+            description: While Redis cannot be reached, the router does not apply the budget (fail-open)
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom, mode: table, size: small, values: [last-number, max]}
+              yAxis: {format: {unit: decimal, decimalPlaces: 1}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (op) (rate(router_sota_budget_store_errors_total{namespace=%q}[$__rate_interval])) * 60 or vector(0)" $ns | quote }}
+                    seriesNameFormat: {{ "{{op}}" | quote }}
       {{- end }}
       tierTokens:
         kind: Panel

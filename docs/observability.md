@@ -129,6 +129,10 @@ open only to the monitoring namespaces, and the public route refuses `/metrics` 
 | `router_requests_total` | `routed_to`, `decided_by`, `team` | One per routing decision |
 | `router_privacy_score` (histogram) | `team` (threshold key) | Privacy score of the requests that reached the privacy gate |
 | `router_sota_budget_used_tokens` (gauge) | `pod` | SOTA tokens counted by the efficiency gate budget. Always 0 while the cap is off (`sota_token_budget: 0`, the default). **Per pod** when it is on |
+| `router_sota_tokens_total` | `team` | Router v0.12.0: tokens of the answers of the SOTA model, per tier (fallbacks and the local-only mode do not count) |
+| `router_sota_budget_window_tokens` (gauge) | `team`, `pod` | Router v0.12.0, SOTA budget on: SOTA tokens of the tier in the last window, read from Redis at the last check of the pod |
+| `router_sota_budget_limit_tokens` (gauge) | `team` | Router v0.12.0: SOTA budget of the tier per window |
+| `router_sota_budget_store_errors_total` | `op` | Router v0.12.0: Redis errors (`read`, `write`); the budget did not apply (fail-open) |
 | `router_namespace_decisions_total` | `target_namespace`, `routed_to`, `source` | Router v0.11.0, namespace policy on: one per decision and restricted namespace (`target_namespace` = `none` for the other requests); `source` = `hint`, `scan`, `hint+scan` or `none` |
 | `router_namespace_labels_loaded` (gauge) | `pod` | 1 when the pod read the namespace labels at least once |
 | `router_namespace_labels` (gauge) | `state` | Labelled namespaces: `restricted`, `public`, `unknown` (another value) |
