@@ -108,18 +108,19 @@ tiers:
     window: 5m
   # Own credential of the triage-agent (components/triage-agent), so its tool-calling loop
   # (Prometheus + ticketing MCP round trips, several model calls per investigation) has a
-  # budget separate from human tiers above. One SOTA investigation is about 30-40k tokens
-  # (4 calls), so 100k SOTA tokens are about 3 investigations in 5 minutes, then local.
+  # budget separate from human tiers above. One SOTA investigation is about 11k SOTA tokens
+  # (5 calls, measured on ocp.8mqfl on 2026-10-06), so 30k SOTA tokens are about 3
+  # investigations in 5 minutes, then local.
   - name: agents
     tokens: 200000
     window: 5m
-    sotaTokens: 100000
+    sotaTokens: 30000
   # Agents of business-critical applications (one agent per application namespace: set its
-  # apiKeyTier to this tier): a larger SOTA budget.
+  # apiKeyTier to this tier): a larger SOTA budget, about 13 investigations in 5 minutes.
   - name: agents-critical
     tokens: 600000
     window: 5m
-    sotaTokens: 400000
+    sotaTokens: 150000
   # Key of the validation repo (check B1): a SOTA budget of 1 token, so its second SOTA request
   # stays local.
   - name: validation

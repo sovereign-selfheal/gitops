@@ -238,8 +238,8 @@ the tokens and stays the ceiling, so keep `sotaTokens` below `tokens`.
 
 | Tier | Gateway limit | SOTA budget | Who |
 |---|---|---|---|
-| `agents` | 200k / 5m | 100k / 5m | triage-agent (about 3 SOTA investigations in 5 minutes, then local) |
-| `agents-critical` | 600k / 5m | 400k / 5m | agents of business-critical applications (set their `apiKeyTier`) |
+| `agents` | 200k / 5m | 30k / 5m | triage-agent (one SOTA investigation is about 11k tokens: about 3 in 5 minutes, then local) |
+| `agents-critical` | 600k / 5m | 150k / 5m | agents of business-critical applications (set their `apiKeyTier`): about 13 investigations in 5 minutes |
 | `validation` | 100k / 5m | 1 | the validation repo (check B1: its second SOTA request stays local) |
 
 - The tier comes from the API key (label `maas-group`, set by the gateway in `x-team`). With one agent per
