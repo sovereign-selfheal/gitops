@@ -223,8 +223,10 @@ agent would stay local. Details: router repo, README "Namespace policy" and
 `docs/namespace-policy.md` (the contract for agents).
 
 The page `routing-live-view` (Route `routing-live-view-maas-routing.<appsDomain>`, sign-in with the
-cluster users who can list namespaces) shows every decision while it happens, the labels of the demo
-namespaces, and a button that changes a label: the page checks first, with the token of the signed-in
+cluster users who can list namespaces) shows every decision while it happens, with the agent that asked
+(the `agent` name of its API-key tier in `tiers`, else `<tier> key`) and, for a tier with a SOTA budget,
+a tag such as `SOTA 25k/30k` (red when the budget is used); the labels of the demo namespaces; and a
+button that changes a label: the page checks first, with the token of the signed-in
 user, that this user may patch the namespace, then its ServiceAccount (allowed on the demo namespaces
 only, ansible repo) writes the label.
 
