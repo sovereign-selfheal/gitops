@@ -2,6 +2,7 @@
 global:
   namespaces:
     triage: agentic-triage
+    triageRestricted: payments
 
 # The images of Tempo and of the collector come from the Tempo and OpenTelemetry operators,
 # which the ansible repo pins by CSV: a new image version is an operator pin change there.
