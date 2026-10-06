@@ -12,8 +12,8 @@ global:
     model: openai/example
 
 # Image of the routing-live-view repo (github.com/sovereign-selfheal/routing-live-view).
-# tag v0.1.1, resolved on quay.io on 2026-10-06
-image: quay.io/sovereign-selfheal/routing-live-view@sha256:7b1c8156931de43c6a5d525fe8132a587cb551dea58a72ad4dc015e210dfde86
+# tag v0.2.0, resolved on quay.io on 2026-10-06
+image: quay.io/sovereign-selfheal/routing-live-view@sha256:6ae452ec2a0604a685fcca356264458bccfeb1658cedf336e1d82351c2ff2246
 # OpenShift oauth-proxy: sign-in with the cluster users. Image of the OpenShift release
 # (ImageStreamTag openshift/oauth-proxy:v4.4).
 # resolved on OCP 4.22.15 (ocp.rw287) on 2026-10-05

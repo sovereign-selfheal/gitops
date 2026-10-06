@@ -38,7 +38,8 @@ here. After that, Argo CD owns every object described in this repo.
   labelled with one of these tier names (see `components/triage-agent/templates/apikey.yaml`). A tier
   with `sotaTokens` also gets a SOTA token budget in the router (v0.12.0, with `sotaBudget.enabled`): the
   tiers `agents-critical` (business-critical applications) and `validation` (used by the `validation`
-  repo, check B1) exist for it.
+  repo, check B1) exist for it. The optional `agent` of a tier is the name that the live page
+  `routing-live-view` shows in its column Agent (env `TIER_LABELS`): set it when an agent gets its tier.
 - **Observability**: this repo deploys the Tempo instance `tempo` (kind `TempoMonolithic`, multi-tenancy
   `openshift`, tenant `router`) and the OpenTelemetry collector `otel` (kind `OpenTelemetryCollector`; the
   operator names its Service and ServiceAccount `otel-collector`) in the namespace `observability`. OTLP
