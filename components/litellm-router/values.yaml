@@ -33,9 +33,9 @@ global:
 # Version (git tag) of the router repo (github.com/sovereign-selfheal/router). The hook
 # code in files/*.py is a copy of that repo at this tag, and the image below must come
 # from the same tag. scripts/sync-router-code.sh sets it and checks the copy (CI).
-routerVersion: v0.11.1
+routerVersion: v0.12.1
 # Image of the router repo: LiteLLM v1.102.0 + fastText language ID model.
-# tag v0.11.1, resolved on quay.io on 2026-10-06 (same image as v0.3.0 to v0.11.0: the Containerfile
+# tag v0.12.1, resolved on quay.io on 2026-10-06 (same image as v0.3.0 to v0.12.0: the Containerfile
 # did not change; it already has opentelemetry and prometheus_client)
 image: quay.io/sovereign-selfheal/router@sha256:567be05d82ff91e88447870d5f6cca37d9bad12eadf91c806932c53be396c6e0
 # Perses dashboard `routing-decisions` (Observe -> Dashboards), only with observability.enabled.
@@ -69,8 +69,9 @@ retryPolicy:
   InternalServerErrorRetries: 1
   ServiceUnavailableErrorRetries: 1
   DefaultRetries: 1
-# Two replicas, preferably on different nodes. If the SOTA token cap of the policy hook is on
-# (sota_token_budget in files/chain.yaml, off by default), its counter is per pod.
+# Two replicas, preferably on different nodes. The SOTA budget per tier (router v0.12.0,
+# global.sotaBudget) shares its counters in Redis (below); the old per-pod cap
+# (sota_token_budget in files/chain.yaml) stays off.
 replicas: 2
 resources:
   requests:
@@ -79,3 +80,17 @@ resources:
   limits:
     cpu: "1"
     memory: 2Gi
+
+# Redis of the SOTA budget per tier (only with global.sotaBudget.enabled): one replica, counters
+# in memory only (no persistence), the password from an ESO Password generator.
+# rhel9/redis-7 (tag latest, manifest list), resolved in the Red Hat catalog on 2026-10-06
+redis:
+  image: registry.redhat.io/rhel9/redis-7@sha256:3a27a8dac47dd2dce166a8f90105d8bb575744f82612f60b47413e51aa66201d
+  maxmemory: 32mb
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 96Mi

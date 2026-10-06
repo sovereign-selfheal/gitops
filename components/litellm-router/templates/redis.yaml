@@ -1,0 +1,139 @@
+{{- if (.Values.global.sotaBudget | default dict).enabled }}
+# Redis of the SOTA budget per tier (router v0.12.0): the LiteLLM pods share the counters of the
+# SOTA tokens here (keys sota-budget:<tier>:<window>, TTL of two windows). Counters in memory only:
+# a restart starts them from zero. When Redis is down the router does not apply the budget
+# (fail-open, a metric counts the errors). Only the LiteLLM pods can connect (NetworkPolicy).
+# Password (32 characters), generated in the cluster once.
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: litellm-redis
+spec:
+  length: 32
+  digits: 10
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: litellm-redis
+spec:
+  refreshInterval: "0"
+  target:
+    name: litellm-redis
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        password: "{{ "{{" }} .password {{ "}}" }}"
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: litellm-redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm-redis
+  labels:
+    app: litellm-redis
+spec:
+  # One replica: two would split the counters.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: litellm-redis
+  template:
+    metadata:
+      labels:
+        app: litellm-redis
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image }}
+          # The entrypoint of the image runs its arguments: run-redis first. No persistence
+          # (the counters live for a few minutes); old windows expire, volatile-ttl frees
+          # the oldest keys first if the memory is full.
+          args:
+            - run-redis
+            - --save
+            - ""
+            - --appendonly
+            - "no"
+            - --maxmemory
+            - {{ .Values.redis.maxmemory | quote }}
+            - --maxmemory-policy
+            - volatile-ttl
+          env:
+            # The image sets requirepass from REDIS_PASSWORD.
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-redis
+                  key: password
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/redis/data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm-redis
+  labels:
+    app: litellm-redis
+spec:
+  selector:
+    app: litellm-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: litellm-redis-from-litellm
+spec:
+  podSelector:
+    matchLabels:
+      app: litellm-redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: litellm
+      ports:
+        - protocol: TCP
+          port: 6379
+{{- end }}

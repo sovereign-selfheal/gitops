@@ -24,4 +24,6 @@ decisionModel:
   {{- toYaml .Values.decisionModel | nindent 2 }}
 namespacePolicy:
   {{- toYaml .Values.namespacePolicy | nindent 2 }}
+sotaBudget:
+  {{- toYaml .Values.sotaBudget | nindent 2 }}
 {{- end }}

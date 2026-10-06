@@ -122,6 +122,34 @@ spec:
             - name: SOTA_SERVED_MATCH
               value: {{ . | quote }}
             {{- end }}
+            {{- if not .Values.global.sota.enabled }}
+            # Local-only mode: sota-smart is the local model, its tokens are not SOTA tokens
+            # (router v0.12.0).
+            - name: SOTA_ENABLED
+              value: "0"
+            {{- end }}
+            {{- $sb := .Values.global.sotaBudget | default dict }}
+            {{- if $sb.enabled }}
+            {{- $budgets := dict }}
+            {{- range .Values.global.tiers }}
+            {{- if .sotaTokens }}
+            {{- $_ := set $budgets .name (int .sotaTokens) }}
+            {{- end }}
+            {{- end }}
+            # SOTA budget per tier (router v0.12.0): SOTA tokens per window of each tier with
+            # sotaTokens; counters in the Redis of this component (templates/redis.yaml).
+            - name: SOTA_BUDGET_TIERS
+              value: {{ toJson $budgets | quote }}
+            - name: SOTA_BUDGET_WINDOW_S
+              value: {{ $sb.windowSeconds | default 300 | quote }}
+            - name: SOTA_BUDGET_REDIS_URL
+              value: "redis://litellm-redis:6379/0"
+            - name: SOTA_BUDGET_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-redis
+                  key: password
+            {{- end }}
           envFrom:
             # COMPANY_API_KEY. Optional: without it SOTA calls fail and LiteLLM
             # falls back to the local model.

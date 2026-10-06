@@ -95,6 +95,10 @@ classifier:
 #             20k tokens is about 5 long answers or 10 agent calls of 2k; answers sent one
 #             after the other (about 50 s each) add up in the window, and after a 429 the
 #             tier opens again within 5 minutes (a demo scene can be repeated soon).
+# sotaTokens (router v0.12.0, only with sotaBudget.enabled): SOTA tokens of the tier per
+# sotaBudget window. When the tier used them, the router sends its requests to the local model
+# (no 429; the agent goes on). Keep it below `tokens`: the gateway limit stays the ceiling. No
+# sotaTokens = no SOTA budget (only the gateway limit).
 tiers:
   - name: research
     tokens: 100000
@@ -104,10 +108,25 @@ tiers:
     window: 5m
   # Own credential of the triage-agent (components/triage-agent), so its tool-calling loop
   # (Prometheus + ticketing MCP round trips, several model calls per investigation) has a
-  # budget separate from human tiers above.
+  # budget separate from human tiers above. One SOTA investigation is about 11k SOTA tokens
+  # (5 calls, measured on ocp.8mqfl on 2026-10-06), so 30k SOTA tokens are about 3
+  # investigations in 5 minutes, then local.
   - name: agents
     tokens: 200000
     window: 5m
+    sotaTokens: 30000
+  # Agents of business-critical applications (one agent per application namespace: set its
+  # apiKeyTier to this tier): a larger SOTA budget, about 13 investigations in 5 minutes.
+  - name: agents-critical
+    tokens: 600000
+    window: 5m
+    sotaTokens: 150000
+  # Key of the validation repo (check B1): a SOTA budget of 1 token, so its second SOTA request
+  # stays local.
+  - name: validation
+    tokens: 100000
+    window: 5m
+    sotaTokens: 1
 
 # ----- Local model profiles --------------------------------------------------------
 # Images are pinned by digest, resolved on the date in the comment.
@@ -198,6 +217,17 @@ localModel:
       hardwareProfile:
         displayName: CPU only (vLLM CPU)
         description: CPU and memory only, no GPU.
+
+# ----- SOTA budget per tier (router v0.12.0) ----------------------------------------
+# Each tier with sotaTokens (see `tiers`) gets a budget of SOTA tokens per window: when the tier
+# used it, the router keeps its requests on the local model instead of the 429 of the gateway.
+# The counters are in a small Redis of the component litellm-router (maas-routing), shared by the
+# LiteLLM pods; a Redis restart starts them from zero, and a Redis error turns the budget off
+# (fail-open: cost control, the privacy gates still run). Set by the seed (sota_budget_enabled of
+# the ansible repo).
+sotaBudget:
+  enabled: false
+  windowSeconds: 300
 
 # ----- Namespace policy (router v0.11.0) -------------------------------------------
 # A request about a namespace labelled sovereign-selfheal.io/data-class=restricted (set by the

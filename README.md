@@ -72,6 +72,7 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 | `decisionModel.enabled` | `false` | `true`: the decision model on its own GPU node (see "Decision model"); needs `modelProfile: gpu` |
 | `namespacePolicy.scan` | `false` | `true`: the router finds namespace names in the request text (router v0.11.0, see "Namespace policy") |
 | `namespacePolicy.hint` | `false` | `true`: the router reads the namespaces that the agents send, and triage-agent sends them |
+| `sotaBudget.enabled` | `false` | `true`: SOTA token budget per tier, with a small Redis (router v0.12.0, see "SOTA budget per tier") |
 
 ## Observability
 
@@ -215,9 +216,10 @@ Application turn the policy on, both off by default:
 
 The alert `QuarkusBuggyAppHighErrorRate` exists once per namespace with a quarkus-buggy-app
 (`alerts.quarkusBuggyApp.namespaceRefs` of the observability component) and keeps the `namespace` label
-(`sum by (namespace)`). The knowledge file of triage-agent names no namespace: the agent uses the one
-of the alert. Do not write a restricted namespace in a fixed prompt: with the scan on, every request of
-the agent would stay local. Details: router repo, README "Namespace policy" and
+(`sum by (namespace)`). The knowledge file of triage-agent writes `<namespace>` in its queries: the agent
+uses the namespace of the alert or of the question, and `agentic-triage` (public) only when there is
+none. Do not write a restricted namespace in a fixed prompt: with the scan on, every request of the
+agent would stay local. Details: router repo, README "Namespace policy" and
 `docs/namespace-policy.md` (the contract for agents).
 
 The page `routing-live-view` (Route `routing-live-view-maas-routing.<appsDomain>`, sign-in with the
@@ -225,6 +227,32 @@ cluster users who can list namespaces) shows every decision while it happens, th
 namespaces, and a button that changes a label: the page checks first, with the token of the signed-in
 user, that this user may patch the namespace, then its ServiceAccount (allowed on the demo namespaces
 only, ansible repo) writes the label.
+
+## SOTA budget per tier
+
+With `sotaBudget.enabled` (seed: `sota_budget_enabled`), each API-key tier with `sotaTokens` (in
+`tiers`, `bootstrap/values.yaml`) gets a budget of **SOTA tokens** per window (`sotaBudget.windowSeconds`,
+default 300). When a tier used it, the router (v0.12.0) keeps the requests of that tier on the **local
+model**: the agent goes on, without the 429 of the gateway. The gateway limit (`tokens`) still counts all
+the tokens and stays the ceiling, so keep `sotaTokens` below `tokens`.
+
+| Tier | Gateway limit | SOTA budget | Who |
+|---|---|---|---|
+| `agents` | 200k / 5m | 30k / 5m | triage-agent (one SOTA investigation is about 11k tokens: about 3 in 5 minutes, then local) |
+| `agents-critical` | 600k / 5m | 150k / 5m | agents of business-critical applications (set their `apiKeyTier`): about 13 investigations in 5 minutes |
+| `validation` | 100k / 5m | 1 | the validation repo (check B1: its second SOTA request stays local) |
+
+- The tier comes from the API key (label `maas-group`, set by the gateway in `x-team`). With one agent per
+  application namespace, each agent has its own key and tier.
+- The counters are in **Redis** (`litellm-redis` in `maas-routing`, one replica, Red Hat `rhel9/redis-7`,
+  no persistence, password from an ESO generator, reachable only from the LiteLLM pods). A Redis restart
+  starts the counters from zero. When Redis is down the router does not apply the budget (fail-open: it
+  controls cost, the privacy gates still run) and counts the errors.
+- Only the answers of the SOTA model count: a fallback to the local model and the local-only mode do not.
+- The log line of a tier with a budget has `sota_budget_used` and `sota_budget_limit`; the reason when the
+  budget is used: `efficiency: SOTA budget of tier agents used (... tokens in 5m) -> LOCAL`.
+- Dashboard `stack-operations`: row "SOTA budget per tier" (one gauge per tier, SOTA tokens per minute,
+  Redis errors).
 
 ## AI-driven triage demo
 

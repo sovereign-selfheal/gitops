@@ -24,7 +24,7 @@ here. After that, Argo CD owns every object described in this repo.
 - **Values set by the seed** (root Application, `helm.valuesObject`): `appsDomain`, `modelProfile`
   (`gpu` or `cpu`), `sota.enabled`, `sota.apiBase`, `sota.model`, `sota.servedMatch`, `sota.reasoning`, `secretStore.enabled`,
   `classifier.mode` (`local`, `external` or `off`), `observability.enabled`, `namespaces.observability`,
-  `decisionModel.enabled`, `namespacePolicy.scan`, `namespacePolicy.hint`, `namespaces.triageRestricted`, and optionally `tiers`. With the decision model and managed GPU nodes the seed
+  `decisionModel.enabled`, `namespacePolicy.scan`, `namespacePolicy.hint`, `namespaces.triageRestricted`, `sotaBudget.enabled`, and optionally `tiers`. With the decision model and managed GPU nodes the seed
   also sets `localModel.profiles.gpu.nodeSelector` to `node-role.kubernetes.io/gpu: ""` (Helm merges it
   with the default `nvidia.com/gpu.present`). Defaults are in `bootstrap/values.yaml`.
 - **Decision model** (`decisionModel.enabled`, only with `modelProfile: gpu`): the component `decision-model`
@@ -35,7 +35,10 @@ here. After that, Argo CD owns every object described in this repo.
   `agents` tier used by `components/triage-agent`'s own router credential. Each tier gets a token-budget
   rule (`TokenRateLimitPolicy`, component `frontdoor`); a component that needs its own credential (because
   it runs in a different namespace than `components/secrets`) generates its own `Password`/`ExternalSecret`
-  labelled with one of these tier names (see `components/triage-agent/templates/apikey.yaml`).
+  labelled with one of these tier names (see `components/triage-agent/templates/apikey.yaml`). A tier
+  with `sotaTokens` also gets a SOTA token budget in the router (v0.12.0, with `sotaBudget.enabled`): the
+  tiers `agents-critical` (business-critical applications) and `validation` (used by the `validation`
+  repo, check B1) exist for it.
 - **Observability**: this repo deploys the Tempo instance `tempo` (kind `TempoMonolithic`, multi-tenancy
   `openshift`, tenant `router`) and the OpenTelemetry collector `otel` (kind `OpenTelemetryCollector`; the
   operator names its Service and ServiceAccount `otel-collector`) in the namespace `observability`. OTLP

@@ -18,7 +18,7 @@ files_dir="${root}/components/litellm-router/files"
 values="${root}/components/litellm-router/values.yaml"
 raw_base="${ROUTER_RAW_BASE:-https://raw.githubusercontent.com/sovereign-selfheal/router}"
 # Hook files taken from the router repo (litellm/<file>). Keep in sync with router/litellm/.
-hook_files=(policy_hook_chain.py privacy_scoring.py namespace_policy.py)
+hook_files=(policy_hook_chain.py privacy_scoring.py namespace_policy.py sota_budget.py)
 
 usage() {
   echo "Usage: $0 sync vX.Y.Z | check" >&2
