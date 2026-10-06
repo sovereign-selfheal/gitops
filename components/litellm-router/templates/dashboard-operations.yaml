@@ -421,8 +421,9 @@ spec:
         kind: Panel
         spec:
           display:
-            name: {{ printf "Tier %s: tokens in the last %s (limit %v)" $t.name $t.window $t.tokens | quote }}
-            description: Approximate. Limitador counts in a fixed window that starts with the first call; this gauge sums the last window up to now.
+            {{- $lim := ternary (printf "%dk" (div (int $t.tokens) 1000)) (printf "%d" (int $t.tokens)) (ge (int $t.tokens) 1000) }}
+            name: {{ printf "%s · %s/%s" $t.name $lim $t.window | quote }}
+            description: {{ printf "Tokens of the tier %s in the last %s, limit %v (all models). Approximate: Limitador counts in a fixed window that starts with the first call; this gauge sums the last window up to now." $t.name $t.window $t.tokens | quote }}
           plugin:
             kind: GaugeChart
             spec:
@@ -448,8 +449,9 @@ spec:
         kind: Panel
         spec:
           display:
-            name: {{ printf "Tier %s: SOTA tokens in the last %s (budget %v)" $t.name $sbWindow $t.sotaTokens | quote }}
-            description: Tokens of the SOTA answers of the tier, from the router counters. At the budget the router sends the requests of the tier to the local model (no 429).
+            {{- $lim := ternary (printf "%dk" (div (int $t.sotaTokens) 1000)) (printf "%d" (int $t.sotaTokens)) (ge (int $t.sotaTokens) 1000) }}
+            name: {{ printf "%s · SOTA %s/%s" $t.name $lim $sbWindow | quote }}
+            description: {{ printf "SOTA tokens of the tier %s in the last %s, budget %v, from the router counters. At the budget the router sends the requests of the tier to the local model (no 429)." $t.name $sbWindow $t.sotaTokens | quote }}
           plugin:
             kind: GaugeChart
             spec:
