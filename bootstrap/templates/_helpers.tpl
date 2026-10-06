@@ -22,4 +22,6 @@ localModel:
   {{- toYaml $profile | nindent 2 }}
 decisionModel:
   {{- toYaml .Values.decisionModel | nindent 2 }}
+namespacePolicy:
+  {{- toYaml .Values.namespacePolicy | nindent 2 }}
 {{- end }}

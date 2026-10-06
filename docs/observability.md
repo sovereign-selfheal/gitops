@@ -50,7 +50,13 @@ numbers for the time range at the top (default 30 minutes), for the audience of 
 - requests kept in the cluster (share), tokens processed in the cluster, tokens sent to the external
   model, sensitive requests kept local (privacy gate), requests over the token budget (429);
 - live: requests and tokens per minute, in the cluster and to the external model; with the `gpu`
-  profile also how busy the local GPU is.
+  profile also how busy the local GPU is;
+- with the namespace policy on (`namespacePolicy.scan` or `hint`, router v0.11.0), a row "Sensitive
+  namespaces": restricted requests sent outside (must stay 0), restricted requests kept in the cluster,
+  the number of restricted namespaces the router reads now, and requests per minute by namespace class.
+
+The live page `routing-live-view` (component of the same name) shows each decision at once, with the
+labels of the demo namespaces: the dashboard follows the Prometheus scrape (30 s) and its refresh (15 s).
 
 The numbers use `increase()` over the time range: a series that starts inside the range (a new pod)
 misses its first requests, so they are close, not exact. The details are in the two other dashboards.
@@ -123,6 +129,9 @@ open only to the monitoring namespaces, and the public route refuses `/metrics` 
 | `router_requests_total` | `routed_to`, `decided_by`, `team` | One per routing decision |
 | `router_privacy_score` (histogram) | `team` (threshold key) | Privacy score of the requests that reached the privacy gate |
 | `router_sota_budget_used_tokens` (gauge) | `pod` | SOTA tokens counted by the efficiency gate budget. Always 0 while the cap is off (`sota_token_budget: 0`, the default). **Per pod** when it is on |
+| `router_namespace_decisions_total` | `target_namespace`, `routed_to`, `source` | Router v0.11.0, namespace policy on: one per decision and restricted namespace (`target_namespace` = `none` for the other requests); `source` = `hint`, `scan`, `hint+scan` or `none` |
+| `router_namespace_labels_loaded` (gauge) | `pod` | 1 when the pod read the namespace labels at least once |
+| `router_namespace_labels` (gauge) | `state` | Labelled namespaces: `restricted`, `public`, `unknown` (another value) |
 | `litellm_total_tokens_metric_total` | `requested_model`, `model`, ... | Tokens per model alias (`local-fast`, `sota-smart`) and served model (`model`), from LiteLLM |
 | `litellm_deployment_successful_fallbacks_total` | `requested_model`, `fallback_model` | A SOTA call failed and LiteLLM used `local-fast` |
 | `litellm_request_total_latency_metric` (histogram) | `requested_model`, ... | End-to-end latency per model, from LiteLLM |
@@ -142,6 +151,8 @@ sum by (requested_model, model) (increase(litellm_total_tokens_metric_total[10m]
 sum(increase(litellm_deployment_successful_fallbacks_total{requested_model="sota-smart"}[1h]))
 # SOTA budget used, per pod
 max by (pod) (router_sota_budget_used_tokens)
+# Requests about a restricted namespace that left the cluster in the last hour (must be 0)
+sum(increase(router_namespace_decisions_total{target_namespace!="none",routed_to!="local-fast"}[1h]))
 ```
 
 ## Try it

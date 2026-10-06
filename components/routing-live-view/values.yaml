@@ -1,0 +1,36 @@
+# `global` is passed by the bootstrap chart. The defaults below exist only for `helm lint`.
+global:
+  appsDomain: apps.example.com
+  namespaces:
+    router: maas-routing
+    triage: agentic-triage
+    triageRestricted: payments
+  localModel:
+    displayName: Local model
+  sota:
+    enabled: true
+    model: openai/example
+
+# Image of the routing-live-view repo (github.com/sovereign-selfheal/routing-live-view).
+# tag v0.1.1, resolved on quay.io on 2026-10-06
+image: quay.io/sovereign-selfheal/routing-live-view@sha256:7b1c8156931de43c6a5d525fe8132a587cb551dea58a72ad4dc015e210dfde86
+# OpenShift oauth-proxy: sign-in with the cluster users. Image of the OpenShift release
+# (ImageStreamTag openshift/oauth-proxy:v4.4).
+# resolved on OCP 4.22.15 (ocp.rw287) on 2026-10-05
+oauthProxyImage: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:c2157a771f0d04641ab2079b3fd7dd43341897833bbe5b78233ca112be575a7a
+# Only users who can list namespaces open the page (oauth-proxy --openshift-sar): the team
+# (cluster-admin through Group selfheal-team) and the cluster admins.
+accessCheck: '{"resource":"namespaces","verb":"list"}'
+# Demo namespaces shown as cards (keys of global.namespaces), in this order.
+demoNamespaceRefs:
+  - triage
+  - triageRestricted
+# Seconds between two reads of the namespace labels (the router reads them every 5 s).
+namespacePollSeconds: 2
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

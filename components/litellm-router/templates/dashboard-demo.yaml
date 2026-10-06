@@ -3,6 +3,8 @@
 {{- $local := .Values.global.localModel.name }}
 {{- $kuadrant := .Values.dashboard.kuadrantNamespace }}
 {{- $gpu := eq .Values.global.modelProfile "gpu" }}
+{{- $np := .Values.global.namespacePolicy | default dict }}
+{{- $nsPolicy := or $np.scan $np.hint }}
 # Perses dashboard for the audience of the demo (Observe -> Dashboards, project {{ $ns }}): a few
 # big numbers for the time range chosen at the top. The details are in routing-decisions (demo)
 # and stack-operations (team). The numbers use increase() over the time range: a series that
@@ -39,6 +41,19 @@ spec:
             {{- if $gpu }}
             - {x: 18, "y": 0, width: 6, height: 9, content: {$ref: "#/spec/panels/gpuBusy"}}
             {{- end }}
+      {{- if $nsPolicy }}
+      # Namespace policy (router v0.11.0): requests about a namespace labelled
+      # sovereign-selfheal.io/data-class=restricted stay in the cluster.
+      - kind: Grid
+        spec:
+          display:
+            title: Sensitive namespaces
+          items:
+            - {x: 0, "y": 0, width: 6, height: 8, content: {$ref: "#/spec/panels/nsLeak"}}
+            - {x: 6, "y": 0, width: 5, height: 8, content: {$ref: "#/spec/panels/nsKept"}}
+            - {x: 11, "y": 0, width: 4, height: 8, content: {$ref: "#/spec/panels/nsRestricted"}}
+            - {x: 15, "y": 0, width: 9, height: 8, content: {$ref: "#/spec/panels/nsLive"}}
+      {{- end }}
     panels:
       keptShare:
         kind: Panel
@@ -201,6 +216,110 @@ spec:
                     datasource: {kind: PrometheusDatasource, name: router-prometheus}
                     query: {{ printf "sum(rate(litellm_total_tokens_metric_total{namespace=%q,model!=%q}[$__rate_interval])) * 60" $ns $local | quote }}
                     seriesNameFormat: External model
+      {{- if $nsPolicy }}
+      nsLeak:
+        kind: Panel
+        spec:
+          display:
+            name: Restricted requests sent outside
+            description: Requests about a restricted namespace that went to the external model. Must stay 0.
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              colorMode: background_solid
+              thresholds:
+                defaultColor: "#3e8635"
+                steps:
+                  - {value: 1, color: "#c9190b"}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "round(sum(increase(router_namespace_decisions_total{namespace=%q,target_namespace!=\"none\",routed_to!=\"local-fast\"}[$__range]))) or vector(0)" $ns | quote }}
+      nsKept:
+        kind: Panel
+        spec:
+          display:
+            name: Restricted kept in the cluster
+            description: Requests about a restricted namespace, answered by the local model before the gates
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              colorMode: background_solid
+              thresholds: {defaultColor: "#3e8635", steps: []}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "round(sum(increase(router_namespace_decisions_total{namespace=%q,target_namespace!=\"none\",routed_to=\"local-fast\"}[$__range]))) or vector(0)" $ns | quote }}
+      nsRestricted:
+        kind: Panel
+        spec:
+          display:
+            name: Restricted namespaces
+            description: Namespaces labelled sovereign-selfheal.io/data-class=restricted, as the router reads them now
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              colorMode: background_solid
+              thresholds: {defaultColor: "#5e40be", steps: []}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "max(router_namespace_labels{namespace=%q,state=\"restricted\"}) or vector(0)" $ns | quote }}
+      nsLive:
+        kind: Panel
+        spec:
+          display:
+            name: Requests per minute by namespace class
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom}
+              yAxis: {format: {unit: decimal, decimalPlaces: 1}}
+              visual: {display: line, lineWidth: 2, areaOpacity: 0.3, stack: all}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum by (target_namespace) (rate(router_namespace_decisions_total{namespace=%q,target_namespace!=\"none\"}[$__rate_interval])) * 60" $ns | quote }}
+                    seriesNameFormat: "Restricted: {{ "{{" }}target_namespace{{ "}}" }}"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(rate(router_namespace_decisions_total{namespace=%q,target_namespace=\"none\",routed_to=\"local-fast\"}[$__rate_interval])) * 60" $ns | quote }}
+                    seriesNameFormat: Other, in the cluster
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "sum(rate(router_namespace_decisions_total{namespace=%q,target_namespace=\"none\",routed_to!=\"local-fast\"}[$__rate_interval])) * 60" $ns | quote }}
+                    seriesNameFormat: Other, external model
+      {{- end }}
       {{- if $gpu }}
       gpuBusy:
         kind: Panel

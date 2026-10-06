@@ -118,6 +118,11 @@ spec:
               value: {{ .Values.ocpMcpUrl | default "" | quote }}
             - name: KNOWLEDGE_FILE
               value: {{ printf "%s/%s" .Values.knowledge.mountPath .Values.knowledge.file | quote }}
+            # Send the namespaces of the investigation to the router (body field
+            # selfheal_namespaces, router v0.11.0 namespace policy). Read by triage-agent
+            # versions with /trigger `namespaces`; older images ignore it.
+            - name: ROUTER_NAMESPACE_HINT
+              value: {{ dig "namespacePolicy" "hint" false .Values.global | ternary "true" "false" | quote }}
             - name: PYTHONUNBUFFERED
               value: "1"
           volumeMounts:

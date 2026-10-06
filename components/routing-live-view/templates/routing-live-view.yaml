@@ -1,0 +1,232 @@
+{{- $ns := .Values.global.namespaces }}
+{{- $demo := list }}
+{{- range .Values.demoNamespaceRefs }}{{- with index $ns . }}{{- $demo = append $demo . }}{{- end }}{{- end }}
+# ServiceAccount of the page. It reads the router logs (Role below) and the namespace labels
+# (ClusterRole sovereign-selfheal-namespace-reader), and patches the label of the demo namespaces
+# only (ClusterRole sovereign-selfheal-demo-namespace-labeler); the ansible repo binds both: the
+# AppProject allows no cluster-scoped objects. The annotation lets oauth-proxy use it as OAuth client.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: routing-live-view
+  labels:
+    app: routing-live-view
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.primary: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"routing-live-view"}}'
+---
+# Read the [policy-router] log lines of the LiteLLM pods.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: routing-live-view-router-logs
+  namespace: {{ required "global.namespaces.router is required" $ns.router }}
+  labels:
+    app: routing-live-view
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: routing-live-view-router-logs
+  namespace: {{ $ns.router }}
+  labels:
+    app: routing-live-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: routing-live-view-router-logs
+subjects:
+  - kind: ServiceAccount
+    name: routing-live-view
+    namespace: {{ .Release.Namespace }}
+---
+# Cookie secret of oauth-proxy (32 bytes), generated in the cluster once.
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: routing-live-view-cookie
+spec:
+  length: 32
+  digits: 10
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: routing-live-view-cookie
+spec:
+  refreshInterval: "0"
+  target:
+    name: routing-live-view-cookie
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        session_secret: "{{ "{{" }} .password {{ "}}" }}"
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: routing-live-view-cookie
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: routing-live-view
+  labels:
+    app: routing-live-view
+spec:
+  # One replica: the counters of the page are in memory, since the pod started.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: routing-live-view
+  template:
+    metadata:
+      labels:
+        app: routing-live-view
+    spec:
+      serviceAccountName: routing-live-view
+      containers:
+        - name: app
+          image: {{ .Values.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DEMO_NAMESPACES
+              value: {{ join "," $demo | quote }}
+            - name: ROUTER_NAMESPACE
+              value: {{ $ns.router | quote }}
+            - name: CLUSTER_NAME
+              value: {{ .Values.global.appsDomain | trimPrefix "apps." | quote }}
+            - name: LOCAL_MODEL_LABEL
+              value: {{ .Values.global.localModel.displayName | default "Local model" | quote }}
+            - name: SOTA_MODEL_LABEL
+              value: {{ ternary (regexReplaceAll "^[^/]+/" (.Values.global.sota.model | default "") "") "off (local-only mode)" (and .Values.global.sota.enabled (ne (.Values.global.sota.model | default "") "")) | quote }}
+            - name: NAMESPACE_POLL_SECONDS
+              value: {{ .Values.namespacePollSeconds | quote }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+        # Sign-in with the OpenShift users. It passes the user's token to the app
+        # (X-Forwarded-Access-Token). A ServiceAccount OAuth client gets only user:info and
+        # user:check-access (OpenShift refuses user:full): the app checks with that token whether
+        # the user may patch the namespace (SelfSubjectAccessReview), then writes with its own
+        # ServiceAccount (patch on the demo namespaces only, ansible repo).
+        - name: oauth-proxy
+          image: {{ .Values.oauthProxyImage }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - --provider=openshift
+            - --https-address=:8443
+            - --http-address=
+            - --upstream=http://localhost:8080
+            - --tls-cert=/etc/tls/private/tls.crt
+            - --tls-key=/etc/tls/private/tls.key
+            - --cookie-secret-file=/etc/proxy/secrets/session_secret
+            - --openshift-service-account=routing-live-view
+            - --openshift-ca=/etc/pki/tls/cert.pem
+            - --openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            - --openshift-sar={{ .Values.accessCheck }}
+            - --pass-access-token=true
+            - --scope=user:info user:check-access
+          ports:
+            - name: https
+              containerPort: 8443
+          readinessProbe:
+            httpGet:
+              path: /oauth/healthz
+              port: https
+              scheme: HTTPS
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/tls/private
+              readOnly: true
+            - name: cookie
+              mountPath: /etc/proxy/secrets
+              readOnly: true
+      volumes:
+        - name: tls
+          secret:
+            secretName: routing-live-view-tls
+        - name: cookie
+          secret:
+            secretName: routing-live-view-cookie
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: routing-live-view
+  labels:
+    app: routing-live-view
+  annotations:
+    # Serving certificate of the service CA for oauth-proxy (Route reencrypt).
+    service.beta.openshift.io/serving-cert-secret-name: routing-live-view-tls
+spec:
+  selector:
+    app: routing-live-view
+  ports:
+    - name: https
+      port: 443
+      targetPort: https
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: routing-live-view
+  labels:
+    app: routing-live-view
+  annotations:
+    # The page waits up to 25 s for new decisions (long polling).
+    haproxy.router.openshift.io/timeout: 60s
+spec:
+  to:
+    kind: Service
+    name: routing-live-view
+  port:
+    targetPort: https
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect

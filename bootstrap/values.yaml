@@ -39,6 +39,9 @@ namespaces:
   observability: observability
   # AI-driven triage demo (quarkus-buggy-app, ticketing-system, both MCP servers, triage-agent).
   triage: agentic-triage
+  # Second quarkus-buggy-app, in a namespace labelled sovereign-selfheal.io/data-class=restricted
+  # by the ansible repo: the agent investigates it with the local model only (namespacePolicy).
+  triageRestricted: payments
 
 # ----- Observability (traces of the router) --------------------------------------
 # Set by the seed from observability_enabled. true: component observability (Tempo and the
@@ -196,6 +199,20 @@ localModel:
         displayName: CPU only (vLLM CPU)
         description: CPU and memory only, no GPU.
 
+# ----- Namespace policy (router v0.11.0) -------------------------------------------
+# A request about a namespace labelled sovereign-selfheal.io/data-class=restricted (set by the
+# ansible repo) stays on the local model, before the gates. No label or "public" keeps the normal
+# routing. Two switches, off in this file; the ansible seed sets them (its defaults: scan on,
+# hint off):
+#   scan: the router finds namespace names in the request text (PromQL, JSON, x.svc, -n x);
+#   hint: the router reads the names that the agents send (body field selfheal_namespaces), and
+#         triage-agent sends them (env ROUTER_NAMESPACE_HINT, triage-agent with /trigger namespaces).
+# The ServiceAccount litellm reads the namespace labels: the ansible repo gives it get/list/watch
+# on namespaces. See the router repo, README "Namespace policy".
+namespacePolicy:
+  scan: false
+  hint: false
+
 # ----- Decision model (component decision-model) ----------------------------------
 # DiffusionGemma 26B-A4B FP8-dynamic served by the vLLM structured-read mode, behind the example
 # decision server of vLLM (/v1/systemone: typed questions, one probability per answer from one
@@ -306,6 +323,13 @@ components:
     enabled: true
     wave: 1
     namespaceRef: triage
+  # The same chart (key `chart`) in the restricted namespace: the agent investigates this one
+  # with the local model only (namespacePolicy).
+  quarkus-buggy-app-restricted:
+    enabled: true
+    chart: quarkus-buggy-app
+    wave: 1
+    namespaceRef: triageRestricted
   ticketing-system:
     enabled: true
     wave: 1
@@ -328,3 +352,9 @@ components:
     # After triage-agent: forwards Alertmanager webhooks to triage-agent's /trigger on :7860.
     wave: 5
     namespaceRef: triage
+  # Live page of the routing decisions and of the namespace labels (repo routing-live-view),
+  # behind the OpenShift oauth-proxy. Reads the LiteLLM logs, so it lives next to the router.
+  routing-live-view:
+    enabled: true
+    wave: 5
+    namespaceRef: router

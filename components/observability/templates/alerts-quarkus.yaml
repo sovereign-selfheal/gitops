@@ -1,9 +1,14 @@
 # User workload monitoring evaluates PrometheusRule objects in the workload namespace.
-# This chart deploys to `observability`, but the rule must live in `agentic-triage` so PromQL
-# can use metrics scraped from quarkus-buggy-app (ServiceMonitor in that namespace).
-{{- $ns := required "global.namespaces.triage is required" .Values.global.namespaces.triage }}
+# This chart deploys to `observability`, but each rule must live in the namespace of one
+# quarkus-buggy-app instance, so PromQL can use the metrics scraped there (ServiceMonitor in that
+# namespace). One rule per entry of alerts.quarkusBuggyApp.namespaceRefs (keys of global.namespaces).
+# `sum by (namespace)`: the alert carries the `namespace` label, which ogx-alert-translator passes
+# to triage-agent and the router reads (namespace policy, router v0.11.0).
 {{- $app := .Values.alerts.quarkusBuggyApp.service }}
 {{- $threshold := .Values.alerts.quarkusBuggyApp.errorRateThreshold }}
+{{- range $ref := .Values.alerts.quarkusBuggyApp.namespaceRefs }}
+{{- $ns := required (printf "global.namespaces.%s is required (alerts.quarkusBuggyApp.namespaceRefs)" $ref) (index $.Values.global.namespaces $ref) }}
+---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -18,16 +23,17 @@ spec:
         - alert: QuarkusBuggyAppHighErrorRate
           expr: |
             (
-              sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",service="{{ $app }}",status=~"5.."}[5m]))
+              sum by (namespace) (rate(http_server_requests_seconds_count{namespace="{{ $ns }}",service="{{ $app }}",status=~"5.."}[5m]))
               /
-              sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",service="{{ $app }}"}[5m]))
+              sum by (namespace) (rate(http_server_requests_seconds_count{namespace="{{ $ns }}",service="{{ $app }}"}[5m]))
             ) > {{ $threshold }}
-          for: {{ .Values.alerts.quarkusBuggyApp.for }}
+          for: {{ $.Values.alerts.quarkusBuggyApp.for }}
           labels:
-            severity: {{ .Values.alerts.quarkusBuggyApp.severity }}
+            severity: {{ $.Values.alerts.quarkusBuggyApp.severity }}
           annotations:
             summary: Quarkus demo app HTTP error rate is above the configured threshold
             description: >-
               The share of HTTP 5xx responses from {{ $app }} in namespace {{ $ns }}
               (http_server_requests_seconds_count, status=~"5..") exceeded
               {{ $threshold }} over the last 5 minutes.
+{{- end }}
