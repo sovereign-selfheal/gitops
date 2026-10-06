@@ -1,0 +1,27 @@
+{{- if .Values.keda.httpAddon.enabled }}
+# User-workload alerts are evaluated by Thanos Ruler and delivered to platform Alertmanager
+# (alertmanager-main). Ansible sets alertmanagerMain.enableUserAlertmanagerConfig so this CR is merged.
+# Alertmanager POSTs to the KEDA HTTP interceptor, which scales ogx-alert-translator from zero.
+apiVersion: monitoring.coreos.com/v1beta1
+kind: AlertmanagerConfig
+metadata:
+  name: ogx-alert-translator
+  namespace: {{ required "global.namespaces.triage is required" .Values.global.namespaces.triage }}
+  labels:
+    app: ogx-alert-translator
+spec:
+  route:
+    receiver: ogx-alert-translator
+    matchers:
+      - name: alertname
+        matchType: "="
+        value: {{ .Values.alertmanager.alertname | quote }}
+      - name: namespace
+        matchType: "="
+        value: {{ required "global.namespaces.triage is required" .Values.global.namespaces.triage | quote }}
+  receivers:
+    - name: ogx-alert-translator
+      webhookConfigs:
+        - url: {{ .Values.alertmanager.webhookUrl | quote }}
+          sendResolved: false
+{{- end }}

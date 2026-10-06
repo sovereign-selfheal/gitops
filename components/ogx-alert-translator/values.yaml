@@ -28,6 +28,12 @@ keda:
     maxReplicas: 3
     cooldownPeriod: 300
 
+# Alertmanager notification routing (merged by platform Alertmanager when ansible sets
+# alertmanagerMain.enableUserAlertmanagerConfig). Only used with the KEDA HTTP add-on.
+alertmanager:
+  alertname: QuarkusBuggyAppHighErrorRate
+  webhookUrl: http://keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080/webhook
+
 # Short timeout: this service only waits for triage-agent's 202 ack on /trigger, not the
 # full (multi-minute) agent run, which triage-agent executes in its own background task.
 requestTimeoutSeconds: 10
