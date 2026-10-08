@@ -39,6 +39,7 @@ Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/obser
 | `ticketing-system` | `agentic-triage` | 1 | Deployment (1 replica, SQLite on a PVC), Service, Route (incident dashboard) |
 | `prometheus-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to `cluster-monitoring-view`) |
 | `ticketing-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR |
+| `ocp-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to the built-in `view` ClusterRole), read-only pods/logs/events tools |
 | `triage-agent` | `agentic-triage` | 4 | ServiceAccount, own tier `ExternalSecret`, Deployment, Service, Route (Gradio chat UI) |
 | `ogx-alert-translator` | `agentic-triage` | 5 | ServiceAccount, Deployment (KEDA owns the replicas), Service, `HTTPScaledObject` (KEDA HTTP add-on, 0 to 3 pods), `AlertmanagerConfig` (webhook to the interceptor for the Quarkus error-rate alert): Alertmanager bridge to the `/trigger` endpoint of triage-agent |
 
@@ -265,7 +266,8 @@ The `agentic-triage` namespace hosts a self-contained demo, imported from
 triage-agent (Gradio UI) ──> OGX sidecar (server-side agentic loop, same pod)
                                  ├──> router.<appsDomain>/v1, model "auto"   (same gateway as any other client, tier "agents")
                                  ├──> prometheus-mcp-server (MCP) ──> Thanos Querier  (error rates, latency of quarkus-buggy-app)
-                                 └──> ticketing-mcp-server (MCP) ──> ticketing-system  (create/read/update incidents)
+                                 ├──> ticketing-mcp-server (MCP) ──> ticketing-system  (create/read/update incidents)
+                                 └──> ocp-mcp-server (MCP) ──> Kubernetes API  (pods, logs, events, read-only)
 ```
 
 - **`quarkus-buggy-app`**: a target application that injects random failures (30% `500` on
@@ -274,6 +276,11 @@ triage-agent (Gradio UI) ──> OGX sidecar (server-side agentic loop, same pod
 - **`ticketing-system`**: a ServiceNow Table API simulator (dashboard at its Route).
 - **`prometheus-mcp-server`** / **`ticketing-mcp-server`**: MCP tool servers (`MCPServer` CR, needs the
   ansible-owned MCP lifecycle operator).
+- **`ocp-mcp-server`**: read-only Kubernetes/OpenShift API tools (pods, logs, events, generic resources)
+  for the agent, run in `--read-only --toolsets core` mode. Upstream `containers/kubernetes-mcp-server`
+  project (`quay.io/containers/kubernetes_mcp_server`), not a `sovereign-selfheal` repo: pinned by digest
+  like the OGX sidecar image, no source contract. Its ServiceAccount is bound by the ansible repo to the
+  built-in `view` ClusterRole (cluster-wide read access).
 - **`triage-agent`**: keeps the upstream demo's OGX sidecar (server-side agentic loop, native MCP tool
   calling) but drops its **external MaaS endpoint** — OGX is configured to call this platform's own
   LiteLLM router (model `auto`) instead, so the privacy gate and local/SOTA routing apply to its traffic

@@ -1,0 +1,72 @@
+# ServiceAccount bound (ansible repo, cluster-scoped RBAC: see AGENTS.md section 2) to the
+# built-in ClusterRole `view`, so this server can read pods, logs, events and other resources
+# across namespaces. Renaming this ServiceAccount needs the matching change in the ansible repo.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ocp-mcp-server-sa
+  labels:
+    app: ocp-mcp-server
+---
+# MCPServer CR (RHOAI MCP lifecycle operator, ansible-owned). The operator creates the
+# Deployment, Service and probes, and registers the server in the OpenShift AI MCP catalog.
+apiVersion: mcp.x-k8s.io/v1alpha1
+kind: MCPServer
+metadata:
+  name: ocp-mcp-server
+  labels:
+    app: ocp-mcp-server
+spec:
+  source:
+    type: ContainerImage
+    containerImage:
+      ref: {{ .Values.image }}
+
+  config:
+    port: 8080
+    path: /mcp
+    # --read-only: no create/update/delete tool is exposed. --toolsets core: pods, logs,
+    # events and generic-resource reads only (no kubeconfig-management or helm/tekton tools).
+    # No --kubeconfig: the binary auto-detects the in-cluster config from the mounted
+    # ServiceAccount token (runtime.security.serviceAccountName below).
+    arguments:
+      - --port
+      - "8080"
+      - --read-only
+      - --toolsets
+      - core
+
+  runtime:
+    replicas: {{ .Values.replicas }}
+    resources:
+      {{- toYaml .Values.resources | nindent 6 }}
+    security:
+      # The CRD has the ServiceAccount here (runtime.security.serviceAccountName), same lesson
+      # as components/prometheus-mcp-server: at runtime.serviceAccountName the field is dropped.
+      serviceAccountName: ocp-mcp-server-sa
+      podSecurityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        capabilities:
+          drop: ["ALL"]
+    health:
+      livenessProbe:
+        tcpSocket:
+          port: 8080
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        failureThreshold: 3
+      readinessProbe:
+        tcpSocket:
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        failureThreshold: 3
+
+  mcp:
+    stateless: true
