@@ -128,7 +128,8 @@ none of them has a code-copy contract with this repo: this repo only pins their 
    and no OGX access** for the translator: it never calls OGX, MCP servers, or the router, and never
    redefines the system prompt, tool list, or model — that definition lives exactly once, in
    `triage-agent/agent.py`. Scale-from-zero uses KEDA (`HTTPScaledObject` when the HTTP add-on is
-   installed by Ansible, or optional Prometheus `ScaledObject` in values). No public Route.
+   installed by Ansible, or optional Prometheus `ScaledObject` in values). No public Route:
+   Alertmanager (or the KEDA HTTP interceptor) calls the cluster Service only.
    - **Callers use the interceptor.** With the HTTP add-on, a sender (Alertmanager) must POST to
      `http://keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080/webhook`: the interceptor
      holds the request and KEDA starts the pod. The Service of the translator has no endpoints while
@@ -137,7 +138,10 @@ none of them has a code-copy contract with this repo: this repo only pins their 
    - **No `replicas` with KEDA.** With KEDA on, the Deployment has no `replicas` field: KEDA owns the
      number of pods. With a value in Git, Argo CD (selfHeal) sets it again and stops the pod that KEDA
      started.
-   - **Known gap.** No Alertmanager receiver sends alerts to the bridge yet.
+   - **Alertmanager routing.** Ansible sets `alertmanagerMain.enableUserAlertmanagerConfig` in
+     `cluster-monitoring-config` (`roles/user_workload_monitoring`, when the KEDA HTTP add-on is on).
+     This repo declares the matching `AlertmanagerConfig` in `components/ogx-alert-translator` (webhook
+     to the KEDA interceptor for `QuarkusBuggyAppHighErrorRate` in the triage namespace).
 
 ## 5. Layout
 
