@@ -3,6 +3,7 @@ global:
   appsDomain: apps.example.com
   namespaces:
     triage: agentic-triage
+    triageRestricted: payments
 
 # Image of the ogx-alert-translator repo (github.com/sovereign-selfheal/ogx-alert-translator).
 # tag v0.1.0, resolved on quay.io on 2026-10-05
@@ -33,6 +34,11 @@ keda:
 alertmanager:
   alertname: QuarkusBuggyAppHighErrorRate
   webhookUrl: http://keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080/webhook
+  # Keys of global.namespaces with a quarkus-buggy-app instance. Keep in sync with
+  # alerts.quarkusBuggyApp.namespaceRefs of components/observability.
+  namespaceRefs:
+    - triage
+    - triageRestricted
 
 # Short timeout: this service only waits for triage-agent's 202 ack on /trigger, not the
 # full (multi-minute) agent run, which triage-agent executes in its own background task.

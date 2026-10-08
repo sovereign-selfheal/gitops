@@ -1,12 +1,16 @@
 {{- if .Values.keda.httpAddon.enabled }}
+{{- range $ref := .Values.alertmanager.namespaceRefs }}
+{{- $ns := required (printf "global.namespaces.%s is required (alertmanager.namespaceRefs)" $ref) (index $.Values.global.namespaces $ref) }}
+---
 # User-workload alerts are evaluated by Thanos Ruler and delivered to platform Alertmanager
 # (alertmanager-main). Ansible sets alertmanagerMain.enableUserAlertmanagerConfig so this CR is merged.
-# Alertmanager POSTs to the KEDA HTTP interceptor, which scales ogx-alert-translator from zero.
+# prometheus-operator adds namespace=<CR namespace> to the route (OnNamespace). One CR per demo namespace
+# that fires QuarkusBuggyAppHighErrorRate. Alertmanager POSTs to the KEDA HTTP interceptor.
 apiVersion: monitoring.coreos.com/v1beta1
 kind: AlertmanagerConfig
 metadata:
   name: ogx-alert-translator
-  namespace: {{ required "global.namespaces.triage is required" .Values.global.namespaces.triage }}
+  namespace: {{ $ns }}
   labels:
     app: ogx-alert-translator
 spec:
@@ -15,13 +19,11 @@ spec:
     matchers:
       - name: alertname
         matchType: "="
-        value: {{ .Values.alertmanager.alertname | quote }}
-      - name: namespace
-        matchType: "="
-        value: {{ required "global.namespaces.triage is required" .Values.global.namespaces.triage | quote }}
+        value: {{ $.Values.alertmanager.alertname | quote }}
   receivers:
     - name: ogx-alert-translator
       webhookConfigs:
-        - url: {{ .Values.alertmanager.webhookUrl | quote }}
+        - url: {{ $.Values.alertmanager.webhookUrl | quote }}
           sendResolved: false
+{{- end }}
 {{- end }}
