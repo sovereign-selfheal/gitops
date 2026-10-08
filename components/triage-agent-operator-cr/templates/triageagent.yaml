@@ -1,0 +1,53 @@
+# TriageAgent CR (triage.sovereign-selfheal.io/v1alpha1), reconciled by the
+# triage-agent-operator (separate repo; the operator Deployment, its ServiceAccount and
+# the CRD install are cluster/ansible-owned — see AGENTS.md section 2). No namespace set
+# here: Argo CD places this CR in the Application's destination namespace, same
+# convention as every other template in this repo.
+{{- $content := "" }}
+{{- if and (not .Values.knowledge.existingConfigMap) .Values.knowledge.useDefaultFile }}
+{{- $content = $.Files.Get (printf "files/%s" .Values.knowledge.file) }}
+{{- end }}
+apiVersion: triage.sovereign-selfheal.io/v1alpha1
+kind: TriageAgent
+metadata:
+  name: {{ .Values.name }}
+  labels:
+    app: {{ .Values.name }}
+spec:
+  image: {{ .Values.image | quote }}
+  ogxImage: {{ .Values.ogxImage | quote }}
+  {{- if not (empty .Values.replicas) }}
+  replicas: {{ .Values.replicas }}
+  {{- end }}
+  router:
+    url: {{ printf "https://router.%s/v1" (required "global.appsDomain is required" .Values.global.appsDomain) | quote }}
+    model: {{ .Values.model | quote }}
+    tlsVerify: {{ .Values.vllmTlsVerify }}
+  apiKey:
+    tier: {{ .Values.apiKeyTier | quote }}
+    prefix: {{ .Values.apiKey.prefix | quote }}
+    length: {{ .Values.apiKey.length }}
+    existingSecret: {{ .Values.apiKey.existingSecret | quote }}
+  mcpServers:
+    prometheus: {{ .Values.mcpServers.prometheus | default (printf "http://prometheus-mcp-server.%s.svc:8080/mcp" (required "global.namespaces.triage is required" .Values.global.namespaces.triage)) | quote }}
+    ticketing: {{ .Values.mcpServers.ticketing | default (printf "http://ticketing-mcp-server.%s.svc:8080/mcp" .Values.global.namespaces.triage) | quote }}
+    ocp: {{ .Values.mcpServers.ocp | default "" | quote }}
+  knowledge:
+    configMapName: {{ .Values.knowledge.existingConfigMap | quote }}
+    fileName: {{ .Values.knowledge.file | quote }}
+    mountPath: {{ .Values.knowledge.mountPath | quote }}
+    {{- if $content }}
+    content: |
+      {{- $content | nindent 6 }}
+    {{- end }}
+  namespaceHint: {{ .Values.namespaceHint | default (dig "namespacePolicy" "hint" false .Values.global) }}
+  route:
+    enabled: {{ .Values.route.enabled }}
+    {{- if .Values.route.host }}
+    host: {{ .Values.route.host | quote }}
+    {{- end }}
+  resources:
+    agent:
+      {{- toYaml .Values.resources.agent | nindent 6 }}
+    ogx:
+      {{- toYaml .Values.resources.ogx | nindent 6 }}
