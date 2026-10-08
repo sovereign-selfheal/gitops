@@ -1,0 +1,7 @@
+apiVersion: v2
+name: ocp-mcp-server
+description: >-
+  MCP server that exposes read-only Kubernetes/OpenShift API tools (pods, logs, events,
+  generic resources) for the triage agent. Wraps the upstream kubernetes-mcp-server project.
+type: application
+version: 0.1.0

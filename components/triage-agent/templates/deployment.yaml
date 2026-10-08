@@ -111,11 +111,10 @@ spec:
               value: {{ printf "http://prometheus-mcp-server.%s.svc:8080/mcp" (required "global.namespaces.triage is required" .Values.global.namespaces.triage) | quote }}
             - name: TICKETING_MCP_URL
               value: {{ printf "http://ticketing-mcp-server.%s.svc:8080/mcp" .Values.global.namespaces.triage | quote }}
-            # Kubernetes API MCP server (pods, logs, events): not part of this component,
-            # deployed separately if needed (see AGENTS.md section 3b). Empty: the agent
-            # runs without that tool.
+            # Kubernetes API MCP server (pods, logs, events): in-cluster Service of
+            # components/ocp-mcp-server, same namespace (see AGENTS.md section 4).
             - name: OCP_MCP_URL
-              value: {{ .Values.ocpMcpUrl | default "" | quote }}
+              value: {{ printf "http://ocp-mcp-server.%s.svc:8080/mcp" .Values.global.namespaces.triage | quote }}
             - name: KNOWLEDGE_FILE
               value: {{ printf "%s/%s" .Values.knowledge.mountPath .Values.knowledge.file | quote }}
             # Send the namespaces of the investigation to the router (body field

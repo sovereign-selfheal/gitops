@@ -28,10 +28,6 @@ model: auto
 # verification on. Set to false only against a self-signed/dev appsDomain.
 vllmTlsVerify: true
 
-# Optional Kubernetes-API MCP server (pods, logs, events), not part of this import (see
-# AGENTS.md section 3b). Empty: the agent runs without that tool.
-ocpMcpUrl: ""
-
 # Static application knowledge injected into the agent system prompt (KNOWLEDGE_FILE).
 # Default: render triage-agent-knowledge from files/knowledge.md. For another agent
 # instance, point existingConfigMap at a different ConfigMap (same data key: knowledge.file).
