@@ -28,6 +28,13 @@ model: auto
 # verification on. Set to false only against a self-signed/dev appsDomain.
 vllmTlsVerify: true
 
+# Optional Kubernetes-API MCP server (components/ocp-mcp-server). Empty: the agent runs
+# without that tool when ocpMcpUseInClusterService is false (same as triage-agent-operator-cr
+# mcpServers.ocp). Non-empty: explicit URL. When ocpMcpUseInClusterService is true and this
+# is empty, the deployment sets the in-cluster Service URL in global.namespaces.triage.
+ocpMcpUrl: ""
+ocpMcpUseInClusterService: true
+
 # Static application knowledge injected into the agent system prompt (KNOWLEDGE_FILE).
 # Default: render triage-agent-knowledge from files/knowledge.md. For another agent
 # instance, point existingConfigMap at a different ConfigMap (same data key: knowledge.file).
