@@ -1,0 +1,20 @@
+# `global` is passed by the bootstrap chart. The default below exists only so that
+# `helm lint` works.
+global:
+  namespaces:
+    triage: agentic-triage
+
+# Image of the upstream kubernetes-mcp-server project (github.com/containers/kubernetes-mcp-server,
+# quay.io/containers/kubernetes_mcp_server). Not a sovereign-selfheal repo and has no source-code
+# contract with this repo, same as the OGX sidecar of components/triage-agent (AGENTS.md section 4):
+# pinned by digest, bumped with a manual PR.
+# tag v0.0.67, resolved on quay.io on 2026-10-08
+image: quay.io/containers/kubernetes_mcp_server@sha256:e47f6ccc5347e1ea6be495d8d9ab55ac8a995fe87800fb984fa770cebe14ad44
+replicas: 1
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

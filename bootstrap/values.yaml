@@ -375,9 +375,27 @@ components:
     enabled: true
     wave: 2
     namespaceRef: triage
+  # Read-only Kubernetes/OpenShift API tools (pods, logs, events) for the triage agent
+  # (upstream kubernetes-mcp-server project, see AGENTS.md section 4).
+  ocp-mcp-server:
+    enabled: true
+    wave: 2
+    namespaceRef: triage
   triage-agent:
     enabled: true
     # After frontdoor (wave 3): the agent calls router.<appsDomain>, which frontdoor exposes.
+    wave: 4
+    namespaceRef: triage
+  # One TriageAgent CR (triage.sovereign-selfheal.io/v1alpha1), reconciled by the
+  # triage-agent-operator (separate repo; CRD + operator Deployment are ansible-owned,
+  # see AGENTS.md section 2). Disabled by default: triage-agent above already runs the
+  # demo instance in agentic-triage. Enable this component (and disable triage-agent) to
+  # move that instance under the operator, or add another entry here with `chart:
+  # triage-agent-operator-cr` and a different namespaceRef (see
+  # quarkus-buggy-app-restricted for the pattern) to give a second namespace — for
+  # example a business-critical application — its own dedicated agent.
+  triage-agent-operator-cr:
+    enabled: false
     wave: 4
     namespaceRef: triage
   ogx-alert-translator:

@@ -101,24 +101,28 @@ none of them has a code-copy contract with this repo: this repo only pins their 
 | `quarkus-buggy-app` | Quarkus 3 source, built with the Jib extension, image `quay.io/sovereign-selfheal/quarkus-buggy-app` |
 | `prometheus-mcp-server` | FastMCP server wrapping PromQL against Thanos, image `quay.io/sovereign-selfheal/prometheus-mcp-server` |
 | `routing-live-view` | Live page of the routing decisions and of the namespace labels (FastAPI, parses the `[policy-router]` log line of the router), image `quay.io/sovereign-selfheal/routing-live-view`; deployed by `components/routing-live-view` in `maas-routing` |
-| `gitops` (this repo) | Every Kubernetes object in `agentic-triage` (`components/quarkus-buggy-app`, `components/ticketing-system`, `components/ticketing-mcp-server`, `components/prometheus-mcp-server`, `components/triage-agent`, `components/ogx-alert-translator`), the image digests in use, including the third-party OGX sidecar image and its `stack_run_config.yaml` (ConfigMap, `components/triage-agent/templates/stack-run-config.yaml`) and per-agent `knowledge.md` (`components/triage-agent/files/knowledge.md`, mounted via ConfigMap) |
+| `gitops` (this repo) | Every Kubernetes object in `agentic-triage` (`components/quarkus-buggy-app`, `components/ticketing-system`, `components/ticketing-mcp-server`, `components/prometheus-mcp-server`, `components/ocp-mcp-server`, `components/triage-agent`, `components/ogx-alert-translator`), the image digests in use, including the third-party OGX sidecar image and its `stack_run_config.yaml` (ConfigMap, `components/triage-agent/templates/stack-run-config.yaml`) and per-agent `knowledge.md` (`components/triage-agent/files/knowledge.md`, mounted via ConfigMap) |
 
 1. **Images by digest.** Same pin convention as §3: `# tag vX.Y.Z, resolved on quay.io on <date>`. A new
-   version is a PR here. The OGX sidecar (`docker.io/ogxai/distribution-starter`) follows the same rule
-   even though it is not a `sovereign-selfheal` image and has no source-code contract with this repo
-   (comment says `# tag <tag>, resolved on docker.io on <date>` instead of quay.io).
+   version is a PR here. The OGX sidecar (`docker.io/ogxai/distribution-starter`) and the Kubernetes-API
+   MCP server (`quay.io/containers/kubernetes_mcp_server`, `components/ocp-mcp-server`) follow the same
+   rule even though neither is a `sovereign-selfheal` image and neither has a source-code contract with
+   this repo (comment says `# tag <tag>, resolved on <registry> on <date>`).
 2. **No external model backend.** `triage-agent`'s OGX sidecar has no external MaaS endpoint (unlike the
    upstream demo it is based on): it is configured (`VLLM_URL` in the Deployment, `stack_run_config.yaml`)
    to call the platform's own gateway (`https://router.<appsDomain>/v1`, model `auto`), so the same policy
    hook and privacy gate that apply to every other client also apply to the agent's traffic. OGX itself
    (the server-side agentic loop and native MCP tool calling) is kept — only its backend target changed.
-3. **MCP servers.** `components/prometheus-mcp-server` and `components/ticketing-mcp-server` render
-   `MCPServer` CRs (`mcp.x-k8s.io/v1alpha1`), reconciled by the ansible-owned MCP lifecycle operator (§2).
-   OGX calls their `server_url` directly (`tools=[{"type": "mcp", ...}]`); `components/triage-agent` does
-   not run its own MCP client.
-4. **Known gap.** The upstream demo's Kubernetes-API MCP server (pod/log/event access) is not part of
-   this import; `triage-agent`'s `OCP_MCP_URL` is empty by default. Set `components/triage-agent`'s
-   `ocpMcpUrl` value if such a server is deployed separately.
+3. **MCP servers.** `components/prometheus-mcp-server`, `components/ticketing-mcp-server` and
+   `components/ocp-mcp-server` render `MCPServer` CRs (`mcp.x-k8s.io/v1alpha1`), reconciled by the
+   ansible-owned MCP lifecycle operator (§2). OGX calls their `server_url` directly
+   (`tools=[{"type": "mcp", ...}]`); `components/triage-agent` does not run its own MCP client.
+4. **Kubernetes-API MCP server.** `components/ocp-mcp-server` runs the upstream
+   `containers/kubernetes-mcp-server` project (`--read-only --toolsets core`: pods, logs, events and
+   generic-resource reads only, no write tool) and fills `triage-agent`'s `OCP_MCP_URL`
+   (`http://ocp-mcp-server.<triage-ns>.svc:8080/mcp`, hardcoded in `components/triage-agent/templates/
+   deployment.yaml` like the other two MCP URLs). Its ServiceAccount `ocp-mcp-server-sa` is bound
+   (ansible repo, §2) to the built-in `view` ClusterRole, cluster-wide.
 5. **Alertmanager bridge (`ogx-alert-translator`).** A stateless webhook receiver in
    `components/ogx-alert-translator` accepts Alertmanager POSTs on `/webhook`, builds a plain-text
    prompt from the alert labels/annotations, and forwards it to the **existing** triage-agent at
