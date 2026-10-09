@@ -1,11 +1,26 @@
 {{- if and .Values.decisionModel.enabled (ne .Values.modelProfile "gpu") }}
 {{- fail "decisionModel.enabled needs modelProfile gpu (the decision model runs on its own GPU node)" }}
 {{- end }}
+{{- /* triage-agent and a TriageAgent CR create objects with the same names (triage-agent):
+       only one of them per namespace. */ -}}
+{{- $agents := dict }}
+{{- range $name, $c := .Values.components }}
+{{- if and $c.enabled (eq ($c.chart | default $name) "triage-agent") }}
+{{- $_ := set $agents (index $.Values.namespaces $c.namespaceRef | toString) $name }}
+{{- end }}
+{{- end }}
+{{- range $name, $c := .Values.components }}
+{{- $ns := index $.Values.namespaces $c.namespaceRef | toString }}
+{{- if and $c.enabled $.Values.triageAgentOperator.enabled (eq ($c.chart | default $name) "triage-agent-operator-cr") (hasKey $agents $ns) }}
+{{- fail (printf "components %s and %s are both enabled in the namespace %s, and they create objects with the same names: disable one of them" (get $agents $ns) $name $ns) }}
+{{- end }}
+{{- end }}
 {{- $global := include "bootstrap.global" . | fromYaml }}
 {{- range $name, $c := .Values.components }}
 {{- /* The observability component needs the operators installed by observability_enabled;
-       the decision-model component needs decisionModel.enabled (its GPU pool). */ -}}
-{{- if and $c.enabled (or (ne $name "observability") $.Values.observability.enabled) (or (ne $name "decision-model") $.Values.decisionModel.enabled) }}
+       the decision-model component needs decisionModel.enabled (its GPU pool);
+       a TriageAgent CR needs the CRD and the operator (triageAgentOperator.enabled). */ -}}
+{{- if and $c.enabled (or (ne $name "observability") $.Values.observability.enabled) (or (ne $name "decision-model") $.Values.decisionModel.enabled) (or (ne ($c.chart | default $name) "triage-agent-operator-cr") $.Values.triageAgentOperator.enabled) }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application

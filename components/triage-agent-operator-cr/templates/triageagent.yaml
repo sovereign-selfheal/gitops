@@ -1,0 +1,69 @@
+# TriageAgent CR (triage.sovereign-selfheal.io/v1alpha1), reconciled by the
+# triage-agent-operator (separate repo; the operator Deployment, its ServiceAccount and
+# the CRD install are cluster/ansible-owned — see AGENTS.md section 2). No namespace set
+# here: Argo CD places this CR in the Application's destination namespace, same
+# convention as every other template in this repo.
+{{- $content := "" }}
+{{- if not .Values.knowledge.existingConfigMap }}
+{{- if not .Values.knowledge.useDefaultFile }}
+{{- fail "knowledge: set existingConfigMap or useDefaultFile: the operator always mounts the knowledge ConfigMap" }}
+{{- end }}
+{{- $content = .Files.Get (printf "files/%s" .Values.knowledge.file) }}
+{{- if not $content }}
+{{- fail (printf "knowledge.file: files/%s is missing or empty in this chart" .Values.knowledge.file) }}
+{{- end }}
+{{- end }}
+{{- $ocp := .Values.mcpServers.ocp }}
+{{- if and (not $ocp) .Values.mcpServers.ocpUseInClusterService (dig "ocpMcpServer" "enabled" true .Values.global) }}
+{{- $ocp = printf "http://ocp-mcp-server.%s.svc:8080/mcp" (required "global.namespaces.triage is required" .Values.global.namespaces.triage) }}
+{{- end }}
+{{- /* null inherits the global hint; an explicit false must win, so no `default` here. */}}
+{{- $hint := dig "namespacePolicy" "hint" false .Values.global }}
+{{- if not (kindIs "invalid" .Values.namespaceHint) }}
+{{- $hint = .Values.namespaceHint }}
+{{- end }}
+apiVersion: triage.sovereign-selfheal.io/v1alpha1
+kind: TriageAgent
+metadata:
+  name: {{ .Values.name }}
+  labels:
+    app: {{ .Values.name }}
+spec:
+  image: {{ .Values.image | quote }}
+  ogxImage: {{ .Values.ogxImage | quote }}
+  {{- if not (kindIs "invalid" .Values.replicas) }}
+  replicas: {{ .Values.replicas }}
+  {{- end }}
+  router:
+    url: {{ printf "https://router.%s/v1" (required "global.appsDomain is required" .Values.global.appsDomain) | quote }}
+    model: {{ .Values.model | quote }}
+    tlsVerify: {{ .Values.vllmTlsVerify }}
+  apiKey:
+    tier: {{ .Values.apiKeyTier | quote }}
+    prefix: {{ .Values.apiKey.prefix | quote }}
+    length: {{ .Values.apiKey.length }}
+    # The ESO Secret of templates/apikey.yaml unless apiKey.existingSecret is set.
+    existingSecret: {{ .Values.apiKey.existingSecret | default (printf "%s-cr-apikey" .Values.name) | quote }}
+  mcpServers:
+    prometheus: {{ .Values.mcpServers.prometheus | default (printf "http://prometheus-mcp-server.%s.svc:8080/mcp" (required "global.namespaces.triage is required" .Values.global.namespaces.triage)) | quote }}
+    ticketing: {{ .Values.mcpServers.ticketing | default (printf "http://ticketing-mcp-server.%s.svc:8080/mcp" .Values.global.namespaces.triage) | quote }}
+    ocp: {{ $ocp | quote }}
+  knowledge:
+    configMapName: {{ .Values.knowledge.existingConfigMap | quote }}
+    fileName: {{ .Values.knowledge.file | quote }}
+    mountPath: {{ .Values.knowledge.mountPath | quote }}
+    {{- if $content }}
+    content: |
+      {{- $content | nindent 6 }}
+    {{- end }}
+  namespaceHint: {{ $hint }}
+  route:
+    enabled: {{ .Values.route.enabled }}
+    {{- if .Values.route.host }}
+    host: {{ .Values.route.host | quote }}
+    {{- end }}
+  resources:
+    agent:
+      {{- toYaml .Values.resources.agent | nindent 6 }}
+    ogx:
+      {{- toYaml .Values.resources.ogx | nindent 6 }}

@@ -46,6 +46,9 @@ jobs:
       - name: Hook code equals the router repo at routerVersion
         run: scripts/sync-router-code.sh check
 
+      - name: Runbook of the TriageAgent CR equals the one of triage-agent
+        run: scripts/sync-triage-knowledge.sh check
+
       - name: Render and validate (gpu and cpu profiles)
         run: |
           for profile in gpu cpu; do
@@ -58,6 +61,14 @@ jobs:
           uv run --no-project --with "pyyaml==${PYYAML_VERSION}" scripts/render.sh gpu rendered/minimal \
             --set observability.enabled=false --set sota.enabled=false --set classifier.mode=local
           kubeconform -summary -ignore-missing-schemas rendered/minimal/*.yaml
+
+      - name: Render and validate (demo agent as a TriageAgent CR)
+        run: |
+          uv run --no-project --with "pyyaml==${PYYAML_VERSION}" scripts/render.sh gpu rendered/operator \
+            --set triageAgentOperator.enabled=true \
+            --set components.triage-agent-operator-cr.enabled=true \
+            --set components.triage-agent.enabled=false
+          kubeconform -summary -ignore-missing-schemas rendered/operator/*.yaml
 
       - name: Render and validate (decision model, as the seed sets it)
         run: |
