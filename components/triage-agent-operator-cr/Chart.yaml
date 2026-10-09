@@ -2,8 +2,7 @@ apiVersion: v2
 name: triage-agent-operator-cr
 description: >-
   Renders one TriageAgent custom resource (triage.sovereign-selfheal.io/v1alpha1),
-  reconciled by the triage-agent-operator (separate repo, deployed by ansible). Reuse
-  this chart with a different namespaceRef (see components/quarkus-buggy-app-restricted
-  for the pattern) to give another namespace its own dedicated triage agent.
+  reconciled by the triage-agent-operator (separate repo, deployed by ansible), and the
+  ESO-generated router API key of the agent.
 type: application
 version: 0.1.0

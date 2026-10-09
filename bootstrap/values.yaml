@@ -318,6 +318,14 @@ decisionModel:
     displayName: NVIDIA L40S (g6e.2xlarge)
     description: One NVIDIA L40S GPU (48 GB) on an AWS g6e.2xlarge node, for the decision model.
 
+# ----- Triage agent operator -----------------------------------------------------
+# Set by the seed (triage_agent_operator_enabled of the ansible repo). true: the ansible repo
+# installed the TriageAgent CRD and the triage-agent-operator, so the component
+# triage-agent-operator-cr can be rendered. false: that component is skipped, because Argo CD
+# cannot sync a TriageAgent CR without the CRD.
+triageAgentOperator:
+  enabled: false
+
 # ----- Components (one Argo CD Application each) --------------------------------
 # wave: Argo CD sync wave of the Application; namespaceRef: key in `namespaces` above.
 components:
@@ -388,12 +396,10 @@ components:
     namespaceRef: triage
   # One TriageAgent CR (triage.sovereign-selfheal.io/v1alpha1), reconciled by the
   # triage-agent-operator (separate repo; CRD + operator Deployment are ansible-owned,
-  # see AGENTS.md section 2). Disabled by default: triage-agent above already runs the
-  # demo instance in agentic-triage. Enable this component (and disable triage-agent) to
-  # move that instance under the operator, or add another entry here with `chart:
-  # triage-agent-operator-cr` and a different namespaceRef (see
-  # quarkus-buggy-app-restricted for the pattern) to give a second namespace — for
-  # example a business-critical application — its own dedicated agent.
+  # see AGENTS.md section 2). Rendered only with triageAgentOperator.enabled. Disabled by
+  # default: triage-agent above already runs the demo instance in agentic-triage. To move
+  # that instance under the operator, enable this component and disable triage-agent.
+  # Both enabled in the same namespace is an error: they create objects with the same names.
   triage-agent-operator-cr:
     enabled: false
     wave: 4

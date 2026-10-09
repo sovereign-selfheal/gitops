@@ -3,6 +3,8 @@ global:
   appsDomain: apps.example.com
   namespaces:
     triage: agentic-triage
+  ocpMcpServer:
+    enabled: true
 
 # Image of the triage-agent repo (github.com/sovereign-selfheal/triage-agent): Gradio UI,
 # talking to the OGX sidecar's Responses API (see AGENTS.md section 3b). The agentic loop
@@ -28,10 +30,13 @@ model: auto
 # verification on. Set to false only against a self-signed/dev appsDomain.
 vllmTlsVerify: true
 
-# Optional Kubernetes-API MCP server (components/ocp-mcp-server). Empty: the agent runs
-# without that tool when ocpMcpUseInClusterService is false (same as triage-agent-operator-cr
-# mcpServers.ocp). Non-empty: explicit URL. When ocpMcpUseInClusterService is true and this
-# is empty, the deployment sets the in-cluster Service URL in global.namespaces.triage.
+# Optional Kubernetes-API MCP server (components/ocp-mcp-server), env OCP_MCP_URL:
+# - ocpMcpUrl set: this URL;
+# - ocpMcpUrl empty and ocpMcpUseInClusterService true: the in-cluster Service in
+#   global.namespaces.triage, but only when the bootstrap has the component ocp-mcp-server on
+#   (global.ocpMcpServer.enabled);
+# - otherwise: empty, and the agent runs without that tool.
+# Same rules as mcpServers.ocp and mcpServers.ocpUseInClusterService of triage-agent-operator-cr.
 ocpMcpUrl: ""
 ocpMcpUseInClusterService: true
 

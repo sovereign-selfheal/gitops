@@ -41,6 +41,7 @@ Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/obser
 | `ticketing-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR |
 | `ocp-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to the built-in `view` ClusterRole), read-only pods/logs/events tools |
 | `triage-agent` | `agentic-triage` | 4 | ServiceAccount, own tier `ExternalSecret`, Deployment, Service, Route (Gradio chat UI) |
+| `triage-agent-operator-cr` | `agentic-triage` | 4 | Off by default, and only with `triageAgentOperator.enabled`: the `TriageAgent` CR of the demo agent and its own tier `ExternalSecret`. The triage-agent-operator (ansible repo) creates the ServiceAccount, Deployment, Service, Route and ConfigMaps from the CR. Use it instead of `triage-agent`, never together in one namespace |
 | `ogx-alert-translator` | `agentic-triage` | 5 | ServiceAccount, Deployment (KEDA owns the replicas), Service, `HTTPScaledObject` (KEDA HTTP add-on, 0 to 3 pods), `AlertmanagerConfig` (webhook to the interceptor for the Quarkus error-rate alert): Alertmanager bridge to the `/trigger` endpoint of triage-agent |
 
 Presidio and LiteLLM run 2 replicas each (value `replicas` of the component), so one pod or node can
@@ -74,6 +75,7 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 | `namespacePolicy.scan` | `false` | `true`: the router finds namespace names in the request text (router v0.11.0, see "Namespace policy") |
 | `namespacePolicy.hint` | `false` | `true`: the router reads the namespaces that the agents send, and triage-agent sends them |
 | `sotaBudget.enabled` | `false` | `true`: SOTA token budget per tier, with a small Redis (router v0.12.0, see "SOTA budget per tier") |
+| `triageAgentOperator.enabled` | `false` | `true`: the ansible repo installed the `TriageAgent` CRD and the triage-agent-operator, so the component `triage-agent-operator-cr` can be rendered |
 
 ## Observability
 
