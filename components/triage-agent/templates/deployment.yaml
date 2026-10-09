@@ -112,10 +112,11 @@ spec:
             - name: TICKETING_MCP_URL
               value: {{ printf "http://ticketing-mcp-server.%s.svc:8080/mcp" .Values.global.namespaces.triage | quote }}
             # Kubernetes API MCP server (pods, logs, events): optional (see AGENTS.md section 4).
-            {{- $ocpMcpUrl := .Values.ocpMcpUrl -}}
-            {{- if and (not $ocpMcpUrl) .Values.ocpMcpUseInClusterService -}}
-            {{- $ocpMcpUrl = printf "http://ocp-mcp-server.%s.svc:8080/mcp" (required "global.namespaces.triage is required" .Values.global.namespaces.triage) -}}
-            {{- end -}}
+            {{- /* No right trim in these actions: it would join "- name" to the comment line. */}}
+            {{- $ocpMcpUrl := .Values.ocpMcpUrl }}
+            {{- if and (not $ocpMcpUrl) .Values.ocpMcpUseInClusterService (dig "ocpMcpServer" "enabled" true .Values.global) }}
+            {{- $ocpMcpUrl = printf "http://ocp-mcp-server.%s.svc:8080/mcp" (required "global.namespaces.triage is required" .Values.global.namespaces.triage) }}
+            {{- end }}
             - name: OCP_MCP_URL
               value: {{ $ocpMcpUrl | quote }}
             - name: KNOWLEDGE_FILE
