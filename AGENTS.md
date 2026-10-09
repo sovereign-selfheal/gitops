@@ -16,7 +16,7 @@ here. After that, Argo CD owns every object described in this repo.
 | Owner | Objects |
 |---|---|
 | `ansible` | Operators (including the RHOAI **MCP lifecycle operator**, needed for the `MCPServer` CRs of `components/prometheus-mcp-server`, `components/ticketing-mcp-server` and `components/ocp-mcp-server`, and the **Custom Metrics Autoscaler** (KEDA) with its `KedaController` and HTTP add-on, needed for the `HTTPScaledObject` of `components/ogx-alert-translator`), DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, the metric monitors of Limitador and Authorino, the `TelemetryPolicy` `openshift-ai-inference-labels` (label `tier` on the Limitador counters, read from the `tier` filter of the AuthPolicy `litellm-apikey`: rename both together), GPU nodes, the namespaces `local-models`, `maas-routing`, `agentic-triage` and `payments` (with their `sovereign-selfheal.io/data-class` labels), the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), the model image pre-pull DaemonSets (namespace `sovereign-selfheal-prepull`), the `ClusterRoleBinding` of the `prometheus-mcp-server-sa` ServiceAccount (namespace `agentic-triage`) to the built-in `cluster-monitoring-view` ClusterRole, the `ClusterRoleBinding` of the `ocp-mcp-server-sa` ServiceAccount (namespace `agentic-triage`) to the built-in `view` ClusterRole, the **triage-agent-operator** (`TriageAgent` CRD, controller Deployment in `triage-agent-operator`, cluster RBAC, Argo CD health check for `TriageAgent`), the ClusterRole that reads namespaces (get/list/watch) and its bindings to the `litellm` and `routing-live-view` ServiceAccounts (namespace `maas-routing`, namespace policy of router v0.11.0), the ClusterRole that patches the demo namespaces only and its binding to `routing-live-view`, Argo CD settings, the root Application, the observability operators (OpenTelemetry, Tempo, Cluster Observability), the `UIPlugin` `distributed-tracing`, the Tempo tenant write permission (ClusterRole + binding), the namespace `observability`, user workload monitoring, team access when `team_users` is set (Keycloak in `keycloak` when Ansible installs it, OAuth IdP, `Group/selfheal-team` + ClusterRoleBinding, the Argo CD RBAC line `g, selfheal-team, role:admin`) |
-| `gitops` (this repo) | Every object inside `local-models`, `maas-routing`, `observability`, `agentic-triage` and `payments` (`namespaces.triageRestricted`: the second quarkus-buggy-app and its PrometheusRule) |
+| `gitops` (this repo) | Every object inside `local-models`, `maas-routing`, `observability`, `agentic-triage` and `payments` (`namespaces.triageRestricted`: the second quarkus-buggy-app and its PrometheusRule). One exception: with `components/triage-agent-operator-cr`, the `TriageAgent` CR is here, but the objects that the triage-agent-operator creates from it (ServiceAccount, Deployment, Service, Route, ConfigMaps) belong to the operator |
 
 - **Namespaces** are created by Ansible with the label `argocd.argoproj.io/managed-by: openshift-gitops`.
   The default Argo CD instance can manage only namespaces with this label, and it cannot create Namespaces.
@@ -24,7 +24,7 @@ here. After that, Argo CD owns every object described in this repo.
 - **Values set by the seed** (root Application, `helm.valuesObject`): `appsDomain`, `modelProfile`
   (`gpu` or `cpu`), `sota.enabled`, `sota.apiBase`, `sota.model`, `sota.servedMatch`, `sota.reasoning`, `secretStore.enabled`,
   `classifier.mode` (`local`, `external` or `off`), `observability.enabled`, `namespaces.observability`,
-  `decisionModel.enabled`, `namespacePolicy.scan`, `namespacePolicy.hint`, `namespaces.triageRestricted`, `sotaBudget.enabled`, and optionally `tiers`. With the decision model and managed GPU nodes the seed
+  `decisionModel.enabled`, `namespacePolicy.scan`, `namespacePolicy.hint`, `namespaces.triageRestricted`, `sotaBudget.enabled`, `triageAgentOperator.enabled`, and optionally `tiers`. With the decision model and managed GPU nodes the seed
   also sets `localModel.profiles.gpu.nodeSelector` to `node-role.kubernetes.io/gpu: ""` (Helm merges it
   with the default `nvidia.com/gpu.present`). Defaults are in `bootstrap/values.yaml`.
 - **Decision model** (`decisionModel.enabled`, only with `modelProfile: gpu`): the component `decision-model`
@@ -58,8 +58,8 @@ here. After that, Argo CD owns every object described in this repo.
   or from an in-cluster generator (see README "Secrets").
 - **Argo CD health checks**: Ansible configures the ArgoCD CR so that Argo CD reports the health of
   `Application` (needed for sync waves between components), `InferenceService`, the Kuadrant policies,
-  `TempoMonolithic` and MCP lifecycle `MCPServer` (`mcp.x-k8s.io`). Argo CD 3.4 knows
-  `OpenTelemetryCollector` by itself.
+  `TempoMonolithic`, MCP lifecycle `MCPServer` (`mcp.x-k8s.io`) and `TriageAgent`
+  (`triage.sovereign-selfheal.io`). Argo CD 3.4 knows `OpenTelemetryCollector` by itself.
 
 ## 3. Contract with the `router` and `presidio` repos
 
@@ -101,7 +101,7 @@ none of them has a code-copy contract with this repo: this repo only pins their 
 | `quarkus-buggy-app` | Quarkus 3 source, built with the Jib extension, image `quay.io/sovereign-selfheal/quarkus-buggy-app` |
 | `prometheus-mcp-server` | FastMCP server wrapping PromQL against Thanos, image `quay.io/sovereign-selfheal/prometheus-mcp-server` |
 | `routing-live-view` | Live page of the routing decisions and of the namespace labels (FastAPI, parses the `[policy-router]` log line of the router), image `quay.io/sovereign-selfheal/routing-live-view`; deployed by `components/routing-live-view` in `maas-routing` |
-| `gitops` (this repo) | Every Kubernetes object in `agentic-triage` (`components/quarkus-buggy-app`, `components/ticketing-system`, `components/ticketing-mcp-server`, `components/prometheus-mcp-server`, `components/ocp-mcp-server`, `components/triage-agent`, `components/ogx-alert-translator`), the image digests in use, including the third-party OGX sidecar image and its `stack_run_config.yaml` (ConfigMap, `components/triage-agent/templates/stack-run-config.yaml`) and per-agent `knowledge.md` (`components/triage-agent/files/knowledge.md`, mounted via ConfigMap) |
+| `gitops` (this repo) | Every Kubernetes object in `agentic-triage` (`components/quarkus-buggy-app`, `components/ticketing-system`, `components/ticketing-mcp-server`, `components/prometheus-mcp-server`, `components/ocp-mcp-server`, `components/triage-agent`, `components/ogx-alert-translator`, and the `TriageAgent` CR of `components/triage-agent-operator-cr` with its API key; the operator owns the objects it creates from the CR), the image digests in use, including the third-party OGX sidecar image and its `stack_run_config.yaml` (ConfigMap, `components/triage-agent/templates/stack-run-config.yaml`) and per-agent `knowledge.md` (`components/triage-agent/files/knowledge.md`, mounted via ConfigMap; `components/triage-agent-operator-cr/files/knowledge.md` is a checked copy, see `scripts/sync-triage-knowledge.sh`) |
 
 1. **Images by digest.** Same pin convention as §3: `# tag vX.Y.Z, resolved on quay.io on <date>`. A new
    version is a PR here. The OGX sidecar (`docker.io/ogxai/distribution-starter`) and the Kubernetes-API
@@ -120,9 +120,10 @@ none of them has a code-copy contract with this repo: this repo only pins their 
 4. **Kubernetes-API MCP server.** `components/ocp-mcp-server` runs the upstream
    `containers/kubernetes-mcp-server` project (`--read-only --toolsets core`: pods, logs, events and
    generic-resource reads only, no write tool). `triage-agent`'s `OCP_MCP_URL` comes from
-   `components/triage-agent` values `ocpMcpUrl` and `ocpMcpUseInClusterService` (empty disables the
-   tool when `ocpMcpUseInClusterService` is false; same idea as `triage-agent-operator-cr`
-   `mcpServers.ocp`). Its ServiceAccount `ocp-mcp-server-sa` is bound (ansible repo, §2) to the
+   `components/triage-agent` values `ocpMcpUrl` and `ocpMcpUseInClusterService`: an explicit URL, or
+   the in-cluster Service when the bootstrap has the component on (`global.ocpMcpServer.enabled`), or
+   empty (no tool). `triage-agent-operator-cr` follows the same rules with `mcpServers.ocp` and
+   `mcpServers.ocpUseInClusterService`. Its ServiceAccount `ocp-mcp-server-sa` is bound (ansible repo, §2) to the
    built-in `view` ClusterRole, cluster-wide.
 5. **Alertmanager bridge (`ogx-alert-translator`).** A stateless webhook receiver in
    `components/ogx-alert-translator` accepts Alertmanager POSTs on `/webhook`, builds a plain-text
@@ -156,6 +157,7 @@ components/<name>/    # one Helm chart per component; reads only `.Values.global
 scripts/render.sh     # renders everything like Argo CD does, and checks the contract
 scripts/ci-values.yaml
 scripts/sync-router-code.sh  # copies the hook code of the router repo at a tag, and checks the copy
+scripts/sync-triage-knowledge.sh  # copies the triage-agent runbook into the TriageAgent CR chart, and checks it
 ```
 
 - The bootstrap chart builds one `global` block (`bootstrap/templates/_helpers.tpl`) and passes it to every
@@ -190,6 +192,7 @@ uvx yamllint .
 for chart in bootstrap components/*/; do helm lint "$chart"; done
 shellcheck scripts/*.sh
 scripts/sync-router-code.sh check
+scripts/sync-triage-knowledge.sh check
 for p in gpu cpu; do uv run --no-project --with pyyaml scripts/render.sh "$p" "rendered/$p" && kubeconform -summary -ignore-missing-schemas rendered/$p/*.yaml; done
 ```
 
