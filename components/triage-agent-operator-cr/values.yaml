@@ -1,0 +1,113 @@
+# `global` is passed by the bootstrap chart. The defaults below exist only so that
+# `helm lint` works. This component reads `global.appsDomain`, `global.namespaces.triage`
+# (for default MCP URLs), `global.ocpMcpServer.enabled` and `global.namespacePolicy.hint` —
+# same contract as components/triage-agent.
+global:
+  appsDomain: apps.example.com
+  namespaces:
+    triage: agentic-triage
+  ocpMcpServer:
+    enabled: true
+  namespacePolicy:
+    hint: false
+
+# Name of the TriageAgent CR and, through the operator, of every child object it owns
+# (ServiceAccount, Deployment, Service, Route, ConfigMaps). Keep `triage-agent`:
+# components/ogx-alert-translator calls the Service triage-agent.<namespace>.svc:7860.
+name: triage-agent
+
+# Images of the triage-agent repo and the OGX sidecar (see AGENTS.md section 4 and 6 of
+# the gitops repo for the pin convention). Kept in sync with components/triage-agent's
+# values.yaml and the operator's own built-in defaults (triage-agent-operator
+# app/config.py); set here explicitly so a bump is one PR in this repo, same as every
+# other component.
+# tag v0.2.0, resolved on quay.io on 2026-10-04
+image: quay.io/sovereign-selfheal/triage-agent@sha256:a8340b5c1b4006dc8418a8c2646caeaf03e3bb52bad41e2830895a32605b7781
+# tag latest, resolved on docker.io on 2026-09-29
+ogxImage: docker.io/ogxai/distribution-starter@sha256:9d6afd54417bee1f37768a054e198becfadbed21d270d8ec1cdfb699e35e9924
+
+# Replicas of the agent Deployment. 0 is kept (agent stopped). null leaves spec.replicas
+# out of the CR. Note: with the current operator, null still gives 1 replica, because the
+# TriageAgent CRD and the operator both default replicas to 1.
+replicas: 1
+
+# Model alias of the router the agent calls. "auto" lets the policy hook pick the real
+# target (local model or SOTA) per request, same as any other client.
+model: auto
+# The router's TLS certificate is expected to be valid (OpenShift wildcard/ACME): keep
+# verification on. Set to false only against a self-signed/dev appsDomain.
+vllmTlsVerify: true
+
+# Own tier of the router token budget (bootstrap/values.yaml `tiers`): keep this name
+# equal to one entry of global.tiers, or the agent's calls are not rate-limited at all.
+apiKeyTier: agents
+apiKey:
+  # Recipe of the generated key: prefix + `length` random characters (same as
+  # components/triage-agent).
+  prefix: 'sk-'
+  length: 40
+  # Empty (default): this chart generates the key with ESO (templates/apikey.yaml, Secret
+  # <name>-cr-apikey) and passes that Secret to the CR, so the operator never reads or
+  # writes Secrets. Set a name to use another Secret instead. That Secret needs the key
+  # `api_key` and the labels `app: maas-litellm` and `maas-group: <apiKeyTier>`, read by
+  # the AuthPolicy of components/frontdoor; without them every router call gets 401.
+  existingSecret: ''
+
+# MCP server URLs the Gradio container passes to OGX.
+mcpServers:
+  # Empty: the in-cluster Service in global.namespaces.triage, where
+  # components/prometheus-mcp-server and components/ticketing-mcp-server run.
+  prometheus: ''
+  ticketing: ''
+  # Optional Kubernetes-API MCP server (pods, logs, events):
+  # - ocp set: this URL;
+  # - ocp empty and ocpUseInClusterService true: the in-cluster Service of
+  #   components/ocp-mcp-server in global.namespaces.triage, but only when the bootstrap has
+  #   that component on (global.ocpMcpServer.enabled);
+  # - otherwise: empty, and the agent runs without that tool.
+  # Same rules as ocpMcpUrl and ocpMcpUseInClusterService of components/triage-agent.
+  ocp: ''
+  ocpUseInClusterService: true
+
+# Static application knowledge injected into the agent system prompt (KNOWLEDGE_FILE).
+# The operator always mounts the knowledge ConfigMap, so the chart fails when the CR would
+# have no knowledge at all.
+knowledge:
+  mountPath: /etc/triage-agent
+  file: knowledge.md
+  # Existing ConfigMap (same data key as `file`) to mount instead of inlining content
+  # from this chart. Takes priority over useDefaultFile.
+  existingConfigMap: ''
+  # When true (default) and existingConfigMap is empty, inline files/<file> (knowledge.md is
+  # the quarkus-buggy-app runbook, a copy of components/triage-agent/files/knowledge.md) as
+  # spec.knowledge.content; the operator creates and owns the ConfigMap. Set it to false only
+  # together with existingConfigMap.
+  useDefaultFile: true
+
+# Sends the namespaces of the investigation to the router (router v0.11.0+ namespace
+# policy). Leave null to inherit global.namespacePolicy.hint, same as
+# components/triage-agent. true or false here wins over the global value.
+namespaceHint: null
+
+route:
+  enabled: true
+  # Optional explicit hostname; default is operator/OpenShift-assigned.
+  host: ''
+
+resources:
+  # Gradio UI container: just renders the chat and streams the OGX response, no inference.
+  agent:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # OGX sidecar: runs the agentic loop and holds the sqlite stores (responses, kv).
+  ogx:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: '1'
+      memory: 1Gi

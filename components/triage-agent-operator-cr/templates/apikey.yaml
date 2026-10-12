@@ -1,0 +1,48 @@
+{{- if not .Values.apiKey.existingSecret }}
+{{- $secret := printf "%s-cr-apikey" .Values.name }}
+# Router credential of the agent, generated in the cluster with ESO (same recipe as
+# components/triage-agent/templates/apikey.yaml, AGENTS.md section 2 "Secrets"). The CR names
+# this Secret in spec.apiKey.existingSecret, so the operator never reads or writes Secrets.
+# The litellm-apikey AuthPolicy (components/frontdoor) finds keys by label across all
+# namespaces (app=maas-litellm, maas-group = tier). The name differs from the Secret of
+# components/triage-agent (triage-agent-apikey): two ExternalSecrets never own the same
+# Secret while the demo instance moves to the operator. refreshInterval "0": generated
+# once, never rotated.
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: {{ $secret }}
+spec:
+  length: {{ .Values.apiKey.length }}
+  digits: 10
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $secret }}
+spec:
+  refreshInterval: "0"
+  target:
+    name: {{ $secret }}
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      metadata:
+        # Read by the AuthPolicy (component frontdoor): maas-group is the tier. Must
+        # match one entry of global.tiers (bootstrap/values.yaml), see .Values.apiKeyTier.
+        labels:
+          authorino.kuadrant.io/managed-by: authorino
+          app: maas-litellm
+          maas-group: {{ .Values.apiKeyTier }}
+      data:
+        api_key: {{ printf "%s{{ .password }}" .Values.apiKey.prefix | quote }}
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: {{ $secret }}
+{{- end }}

@@ -26,4 +26,7 @@ namespacePolicy:
   {{- toYaml .Values.namespacePolicy | nindent 2 }}
 sotaBudget:
   {{- toYaml .Values.sotaBudget | nindent 2 }}
+{{- /* The triage agents use the Kubernetes-API MCP server only when its component is on. */}}
+ocpMcpServer:
+  enabled: {{ dig "ocp-mcp-server" "enabled" false .Values.components }}
 {{- end }}
