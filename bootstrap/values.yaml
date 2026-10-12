@@ -324,7 +324,7 @@ decisionModel:
 # triage-agent-operator-cr can be rendered. false: that component is skipped, because Argo CD
 # cannot sync a TriageAgent CR without the CRD.
 triageAgentOperator:
-  enabled: false
+  enabled: true
 
 # ----- Components (one Argo CD Application each) --------------------------------
 # wave: Argo CD sync wave of the Application; namespaceRef: key in `namespaces` above.
@@ -389,19 +389,19 @@ components:
     enabled: true
     wave: 2
     namespaceRef: triage
+  # Direct Helm Deployment (legacy). Use triage-agent-operator-cr instead unless you need
+  # this chart for a one-off comparison; never enable both in the same namespace.
   triage-agent:
-    enabled: true
+    enabled: false
     # After frontdoor (wave 3): the agent calls router.<appsDomain>, which frontdoor exposes.
     wave: 4
     namespaceRef: triage
   # One TriageAgent CR (triage.sovereign-selfheal.io/v1alpha1), reconciled by the
   # triage-agent-operator (separate repo; CRD + operator Deployment are ansible-owned,
-  # see AGENTS.md section 2). Rendered only with triageAgentOperator.enabled. Disabled by
-  # default: triage-agent above already runs the demo instance in agentic-triage. To move
-  # that instance under the operator, enable this component and disable triage-agent.
+  # see AGENTS.md section 2). Rendered only with triageAgentOperator.enabled.
   # Both enabled in the same namespace is an error: they create objects with the same names.
   triage-agent-operator-cr:
-    enabled: false
+    enabled: true
     wave: 4
     namespaceRef: triage
   ogx-alert-translator:
