@@ -62,13 +62,13 @@ jobs:
             --set observability.enabled=false --set sota.enabled=false --set classifier.mode=local
           kubeconform -summary -ignore-missing-schemas rendered/minimal/*.yaml
 
-      - name: Render and validate (demo agent as a TriageAgent CR)
+      - name: Render and validate (demo agent as a direct Deployment, legacy chart)
         run: |
-          uv run --no-project --with "pyyaml==${PYYAML_VERSION}" scripts/render.sh gpu rendered/operator \
-            --set triageAgentOperator.enabled=true \
-            --set components.triage-agent-operator-cr.enabled=true \
-            --set components.triage-agent.enabled=false
-          kubeconform -summary -ignore-missing-schemas rendered/operator/*.yaml
+          uv run --no-project --with "pyyaml==${PYYAML_VERSION}" scripts/render.sh gpu rendered/legacy-agent \
+            --set triageAgentOperator.enabled=false \
+            --set components.triage-agent-operator-cr.enabled=false \
+            --set components.triage-agent.enabled=true
+          kubeconform -summary -ignore-missing-schemas rendered/legacy-agent/*.yaml
 
       - name: Render and validate (decision model, as the seed sets it)
         run: |
