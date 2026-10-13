@@ -3,7 +3,9 @@ global:
   appsDomain: apps.example.com
   namespaces:
     triage: agentic-triage
-    triageRestricted: payments
+    payments: payments
+    rhReserve: rh-reserve
+    reverseProxyApp: reverse-proxy-app
 
 # Image of the ogx-alert-translator repo (github.com/sovereign-selfheal/ogx-alert-translator).
 # tag v0.1.0, resolved on quay.io on 2026-10-05
@@ -34,14 +36,24 @@ keda:
 alertmanager:
   alertname: QuarkusBuggyAppHighErrorRate
   webhookUrl: http://keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080/webhook
-  # Keys of global.namespaces with a quarkus-buggy-app instance. Keep in sync with
+  # Keys of global.namespaces with a quarkus-buggy-app instance (one per monitored
+  # application, each with its own agent). Keep in sync with
   # alerts.quarkusBuggyApp.namespaceRefs of components/observability.
   namespaceRefs:
-    - triage
-    - triageRestricted
+    - payments
+    - rhReserve
+    - reverseProxyApp
 
-# Short timeout: this service only waits for triage-agent's 202 ack on /trigger, not the
-# full (multi-minute) agent run, which triage-agent executes in its own background task.
+# Name and port of the triage-agent Service that runs in the *alert's own* namespace (one
+# TriageAgent CR per monitored-application namespace, see components/triage-agent-operator-cr).
+# The translator builds the target URL itself from the alert's `namespace` label:
+# http://<triageAgentService>.<alert namespace>.svc:<triageAgentPort>/trigger. This keeps one
+# translator shared by every agent, instead of one translator per namespace.
+triageAgentService: triage-agent
+triageAgentPort: 7860
+
+# Short timeout: this service only waits for the agent's 202 ack on /trigger, not the
+# full (multi-minute) agent run, which the agent executes in its own background task.
 requestTimeoutSeconds: 10
 
 resources:

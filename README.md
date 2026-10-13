@@ -33,16 +33,15 @@ Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/obser
 | `presidio` | `maas-routing` | 1 | Deployment (2 replicas), PodDisruptionBudget, Service, NetworkPolicy (no egress) |
 | `litellm-router` | `maas-routing` | 2 | ConfigMap (config + hook code + policies), Deployment (2 replicas), PodDisruptionBudget, Service (API port 80, metrics 9091), ServiceMonitor, NetworkPolicy (4000 from the gateway, 9091 from monitoring), Perses dashboards `sovereign-at-a-glance` (audience), `routing-decisions` (demo) and `stack-operations` (team) and their datasources (only with `observability.enabled`) |
 | `frontdoor` | `maas-routing` | 3 | HTTPRoute, AuthPolicy (API key; refuses `/metrics`), TokenRateLimitPolicy (POST requests only) |
-| `quarkus-buggy-app` | `agentic-triage` | 1 | Deployment, Service, ServiceMonitor, Route (target of the triage demo, injects random 500s/503s/latency) |
 | `routing-live-view` | `maas-routing` | 5 | Live page of the routing decisions and of the namespace labels (repo `routing-live-view`): Deployment with the OpenShift oauth-proxy, Service, Route (reencrypt), ServiceAccount, Role to read the LiteLLM logs, cookie secret (ESO generator). See "Namespace policy" |
-| `quarkus-buggy-app-restricted` | `payments` | 1 | The same chart (`chart: quarkus-buggy-app`) in the namespace labelled `restricted`: the agent investigates it with the local model only (see "Namespace policy") |
-| `ticketing-system` | `agentic-triage` | 1 | Deployment (1 replica, SQLite on a PVC), Service, Route (incident dashboard) |
-| `prometheus-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to `cluster-monitoring-view`) |
-| `ticketing-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR |
-| `ocp-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to the built-in `view` ClusterRole), read-only pods/logs/events tools |
+| `ticketing-system` | `agentic-triage` | 1 | Deployment (1 replica, SQLite on a PVC), Service, Route (incident dashboard); shared by every agent |
+| `prometheus-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to `cluster-monitoring-view`); shared by every agent |
+| `ticketing-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR; shared by every agent |
+| `ocp-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to the built-in `view` ClusterRole), read-only pods/logs/events tools; shared by every agent |
 | `triage-agent` | `agentic-triage` | 4 | Off by default (legacy): ServiceAccount, own tier `ExternalSecret`, Deployment, Service, Route (Gradio chat UI). Use `triage-agent-operator-cr` instead |
-| `triage-agent-operator-cr` | `agentic-triage` | 4 | Default demo agent, with `triageAgentOperator.enabled`: the `TriageAgent` CR and its own tier `ExternalSecret`. The triage-agent-operator (ansible repo) creates the ServiceAccount, Deployment, Service, Route and ConfigMaps from the CR. Never enable together with `triage-agent` in one namespace |
-| `ogx-alert-translator` | `agentic-triage` | 5 | ServiceAccount, Deployment (KEDA owns the replicas), Service, `HTTPScaledObject` (KEDA HTTP add-on, 0 to 3 pods), `AlertmanagerConfig` (webhook to the interceptor for the Quarkus error-rate alert): Alertmanager bridge to the `/trigger` endpoint of triage-agent |
+| `quarkus-buggy-app-payments`, `quarkus-buggy-app-rh-reserve`, `quarkus-buggy-app-reverse-proxy-app` | `payments`, `rh-reserve`, `reverse-proxy-app` | 1 | The same chart (`chart: quarkus-buggy-app`), once per monitored-application namespace: Deployment, Service, ServiceMonitor, Route (target of the triage demo, injects random 500s/503s/latency) |
+| `triage-agent-payments`, `triage-agent-rh-reserve`, `triage-agent-reverse-proxy-app` | `payments`, `rh-reserve`, `reverse-proxy-app` | 4 | The same chart (`chart: triage-agent-operator-cr`), once per monitored-application namespace, each with its own `apiKeyTier` (see "Per-component value overrides" in AGENTS.md): the `TriageAgent` CR and its own tier `ExternalSecret`. The triage-agent-operator (ansible repo) creates the ServiceAccount, Deployment, Service, Route and ConfigMaps from each CR. Never enable `triage-agent` (legacy) in the same namespace as one of these |
+| `ogx-alert-translator` | `agentic-triage` | 5 | ServiceAccount, Deployment (KEDA owns the replicas), Service, `HTTPScaledObject` (KEDA HTTP add-on, 0 to 3 pods), one `AlertmanagerConfig` per monitored-application namespace (webhook to the interceptor for the Quarkus error-rate alert): a single Alertmanager bridge, shared by every agent, that forwards each alert to the `/trigger` endpoint of the agent in the alert's own namespace |
 
 Presidio and LiteLLM run 2 replicas each (value `replicas` of the component), so one pod or node can
 fail without stopping the router. A preferred pod anti-affinity puts the replicas on different nodes
@@ -73,9 +72,10 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 | `observability.enabled` | `true` | `false`: no Tempo, no collector, no traces (see "Observability") |
 | `decisionModel.enabled` | `false` | `true`: the decision model on its own GPU node (see "Decision model"); needs `modelProfile: gpu` |
 | `namespacePolicy.scan` | `false` | `true`: the router finds namespace names in the request text (router v0.11.0, see "Namespace policy") |
-| `namespacePolicy.hint` | `false` | `true`: the router reads the namespaces that the agents send, and triage-agent sends them |
+| `namespacePolicy.hint` | `false` | `true`: the router reads the namespaces that the agents send, and each agent sends them |
 | `sotaBudget.enabled` | `false` | `true`: SOTA token budget per tier, with a small Redis (router v0.12.0, see "SOTA budget per tier") |
-| `triageAgentOperator.enabled` | `true` | `false`: skip `triage-agent-operator-cr` when the ansible repo did not install the `TriageAgent` CRD and the triage-agent-operator |
+| `triageAgentOperator.enabled` | `true` | `false`: skip every `triage-agent-operator-cr` instance when the ansible repo did not install the `TriageAgent` CRD and the triage-agent-operator |
+| `namespaces.payments`, `namespaces.rhReserve`, `namespaces.reverseProxyApp` | `payments`, `rh-reserve`, `reverse-proxy-app` | Monitored-application namespaces, each with its own `quarkus-buggy-app` and its own agent |
 
 ## Observability
 
@@ -201,8 +201,9 @@ chooses "SOTA".
 
 Since router v0.11.0 a request about a namespace labelled `sovereign-selfheal.io/data-class=restricted`
 stays on the local model, before the gates. No label or `public` keeps the normal routing. The ansible
-repo creates the namespaces with their labels (`agentic-triage`: `public`, `payments`: `restricted`) and
-gives the ServiceAccount `maas-routing/litellm` get/list/watch on namespaces. A label can change live:
+repo creates the namespaces with their labels (`agentic-triage`: `public`; `payments`, `rh-reserve` and
+`reverse-proxy-app`: set per namespace, for example `restricted` for `payments`) and gives the
+ServiceAccount `maas-routing/litellm` get/list/watch on namespaces. A label can change live:
 
 ```bash
 oc label namespace payments sovereign-selfheal.io/data-class=public --overwrite
@@ -217,11 +218,13 @@ Application turn the policy on, both off by default:
   and triage-agent sends it (env `ROUTER_NAMESPACE_HINT`; needs a triage-agent version with
   `namespaces` in `/trigger`). The field is removed before any model call.
 
-The alert `QuarkusBuggyAppHighErrorRate` exists once per namespace with a quarkus-buggy-app
-(`alerts.quarkusBuggyApp.namespaceRefs` of the observability component) and keeps the `namespace` label
-(`sum by (namespace)`). The knowledge file of triage-agent writes `<namespace>` in its queries: the agent
-uses the namespace of the alert or of the question, and `agentic-triage` (public) only when there is
-none. Do not write a restricted namespace in a fixed prompt: with the scan on, every request of the
+The alert `QuarkusBuggyAppHighErrorRate` exists once per monitored-application namespace
+(`alerts.quarkusBuggyApp.namespaceRefs` of the observability component: `payments`, `rh-reserve`,
+`reverse-proxy-app`) and keeps the `namespace` label (`sum by (namespace)`). `ogx-alert-translator`
+reads that label to pick which agent's `/trigger` endpoint to call (see "AI-driven triage demo"). The
+knowledge file of each agent writes `<namespace>` in its queries: the agent uses the namespace of the
+alert or of the question, and `agentic-triage` (public, the shared-services namespace) only when there
+is none. Do not write a restricted namespace in a fixed prompt: with the scan on, every request of the
 agent would stay local. Details: router repo, README "Namespace policy" and
 `docs/namespace-policy.md` (the contract for agents).
 
@@ -243,8 +246,10 @@ the tokens and stays the ceiling, so keep `sotaTokens` below `tokens`.
 
 | Tier | Gateway limit | SOTA budget | Who |
 |---|---|---|---|
-| `agents` | 200k / 5m | 30k / 5m | triage-agent (one SOTA investigation is about 11k tokens: about 3 in 5 minutes, then local) |
-| `agents-critical` | 600k / 5m | 150k / 5m | agents of business-critical applications (set their `apiKeyTier`): about 13 investigations in 5 minutes |
+| `agents-payments` | 200k / 5m | 30k / 5m | agent of `payments` (one SOTA investigation is about 11k tokens: about 3 in 5 minutes, then local) |
+| `agents-rh-reserve` | 200k / 5m | 30k / 5m | agent of `rh-reserve` |
+| `agents-reverse-proxy-app` | 200k / 5m | 30k / 5m | agent of `reverse-proxy-app` |
+| `agents-critical` | 600k / 5m | 150k / 5m | agents of business-critical applications not covered by a dedicated tier above (set their `apiKeyTier`): about 13 investigations in 5 minutes |
 | `validation` | 100k / 5m | 1 | the validation repo (check B1: its second SOTA request stays local) |
 
 - The tier comes from the API key (label `maas-group`, set by the gateway in `x-team`). With one agent per
@@ -261,42 +266,64 @@ the tokens and stays the ceiling, so keep `sotaTokens` below `tokens`.
 
 ## AI-driven triage demo
 
-The `agentic-triage` namespace hosts a self-contained demo, imported from
-[`matteo-grimaldi/ocp-trobleshooter-demo`](https://github.com/matteo-grimaldi/ocp-trobleshooter-demo):
+Originally imported from
+[`matteo-grimaldi/ocp-trobleshooter-demo`](https://github.com/matteo-grimaldi/ocp-trobleshooter-demo),
+the demo now spans four namespaces: a shared-services namespace (`agentic-triage`) and one namespace per
+monitored application (`payments`, `rh-reserve`, `reverse-proxy-app`), each with its own buggy app and
+its own agent:
 
 ```
-triage-agent (Gradio UI) ──> OGX sidecar (server-side agentic loop, same pod)
-                                 ├──> router.<appsDomain>/v1, model "auto"   (same gateway as any other client, tier "agents")
-                                 ├──> prometheus-mcp-server (MCP) ──> Thanos Querier  (error rates, latency of quarkus-buggy-app)
-                                 ├──> ticketing-mcp-server (MCP) ──> ticketing-system  (create/read/update incidents)
-                                 └──> ocp-mcp-server (MCP) ──> Kubernetes API  (pods, logs, events, read-only)
+                      agentic-triage (shared services)
+                      ├── ticketing-system
+                      ├── prometheus-mcp-server, ticketing-mcp-server, ocp-mcp-server
+                      └── ogx-alert-translator
+
+payments / rh-reserve / reverse-proxy-app (one of each, per namespace)
+  quarkus-buggy-app
+  triage-agent (Gradio UI, TriageAgent CR) ──> OGX sidecar (server-side agentic loop, same pod)
+                                                  ├──> router.<appsDomain>/v1, model "auto"   (own tier, e.g. "agents-payments")
+                                                  ├──> prometheus-mcp-server (MCP, agentic-triage) ──> Thanos Querier
+                                                  ├──> ticketing-mcp-server (MCP, agentic-triage) ──> ticketing-system
+                                                  └──> ocp-mcp-server (MCP, agentic-triage) ──> Kubernetes API (read-only)
 ```
 
 - **`quarkus-buggy-app`**: a target application that injects random failures (30% `500` on
   `/api/products`, 40% `503` on `/api/inventory`, 20% 3s latency on `/api/orders`) and generates its own
-  traffic, so error metrics move even without manual requests.
-- **`ticketing-system`**: a ServiceNow Table API simulator (dashboard at its Route).
+  traffic, so error metrics move even without manual requests. One instance per monitored-application
+  namespace (bootstrap components `quarkus-buggy-app-payments`, `quarkus-buggy-app-rh-reserve`,
+  `quarkus-buggy-app-reverse-proxy-app`, same chart).
+- **`ticketing-system`**: a ServiceNow Table API simulator (dashboard at its Route). Runs once, in
+  `agentic-triage`, shared by every agent.
 - **`prometheus-mcp-server`** / **`ticketing-mcp-server`**: MCP tool servers (`MCPServer` CR, needs the
-  ansible-owned MCP lifecycle operator).
+  ansible-owned MCP lifecycle operator). Run once, in `agentic-triage`; every agent calls them
+  cross-namespace.
 - **`ocp-mcp-server`**: read-only Kubernetes/OpenShift API tools (pods, logs, events, generic resources)
-  for the agent, run in `--read-only --toolsets core` mode. Upstream `containers/kubernetes-mcp-server`
+  for the agents, run in `--read-only --toolsets core` mode. Upstream `containers/kubernetes-mcp-server`
   project (`quay.io/containers/kubernetes_mcp_server`), not a `sovereign-selfheal` repo: pinned by digest
   like the OGX sidecar image, no source contract. Its ServiceAccount is bound by the ansible repo to the
-  built-in `view` ClusterRole (cluster-wide read access).
-- **`triage-agent`**: keeps the upstream demo's OGX sidecar (server-side agentic loop, native MCP tool
-  calling) but drops its **external MaaS endpoint** — OGX is configured to call this platform's own
-  LiteLLM router (model `auto`) instead, so the privacy gate and local/SOTA routing apply to its traffic
-  too. Source and images: `triage-agent`, `mock-ticketing-system`, `quarkus-buggy-app`,
-  `prometheus-mcp-server` repos (see `AGENTS.md` §4); the OGX sidecar image itself is a third-party image
+  built-in `view` ClusterRole (cluster-wide read access). Runs once, in `agentic-triage`.
+- **`triage-agent`** (one `TriageAgent` CR per monitored-application namespace,
+  `components/triage-agent-operator-cr`): keeps the upstream demo's OGX sidecar (server-side agentic
+  loop, native MCP tool calling) but drops its **external MaaS endpoint** — OGX is configured to call
+  this platform's own LiteLLM router (model `auto`) instead, so the privacy gate and local/SOTA routing
+  apply to its traffic too. Each instance has its own router credential and tier (`agents-payments`,
+  `agents-rh-reserve`, `agents-reverse-proxy-app`), set with a per-component `values` override in
+  `bootstrap/values.yaml` (see `AGENTS.md` §2 "Per-component value overrides"); all three use the same CR
+  name (`triage-agent`), so `ogx-alert-translator` can reach any of them by the same convention. Source
+  and images: `triage-agent`, `mock-ticketing-system`, `quarkus-buggy-app`, `prometheus-mcp-server`
+  repos (see `AGENTS.md` §4); the OGX sidecar image itself is a third-party image
   (`ogxai/distribution-starter`), pinned by digest in `gitops` only, not built by any of those repos.
-- **`ogx-alert-translator`**: an Alertmanager webhook bridge (`/webhook`). It turns the alert into a
-  prompt and calls the `/trigger` endpoint of triage-agent, which runs the agent in the background. It
-  scales from zero with the KEDA HTTP add-on, so senders POST to the interceptor
+- **`ogx-alert-translator`**: a single Alertmanager webhook bridge (`/webhook`), shared by every agent,
+  deployed once in `agentic-triage`. It turns an alert into a prompt and calls the `/trigger` endpoint of
+  the agent that runs in the **alert's own namespace** — it reads the alert's `namespace` label and
+  builds `http://triage-agent.<namespace>.svc:7860/trigger`, instead of a fixed target. It scales from
+  zero with the KEDA HTTP add-on, so senders POST to the interceptor
   (`keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080`, see `AGENTS.md` §4). Ansible
-  enables `alertmanagerMain.enableUserAlertmanagerConfig`; this repo adds the `AlertmanagerConfig`.
+  enables `alertmanagerMain.enableUserAlertmanagerConfig`; this repo adds one `AlertmanagerConfig` per
+  monitored-application namespace, all pointing to the same translator.
 
-Try the demo prompts from the chat UI's Route, or open an incident manually against the ticketing
-system's `/api/incidents` endpoint and ask the agent to investigate it.
+Try the demo prompts from any agent's chat UI Route, or open an incident manually against the ticketing
+system's `/api/incidents` endpoint and ask the agent of the matching namespace to investigate it.
 
 ## Router code and images
 

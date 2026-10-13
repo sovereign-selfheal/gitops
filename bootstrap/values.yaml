@@ -37,11 +37,17 @@ namespaces:
   models: local-models
   router: maas-routing
   observability: observability
-  # AI-driven triage demo (quarkus-buggy-app, ticketing-system, both MCP servers, triage-agent).
+  # Shared AI-driven triage services: ticketing-system, the three MCP servers, and
+  # ogx-alert-translator. No quarkus-buggy-app and no agent live here any more: each
+  # monitored application has its own namespace (see below) with its own buggy app and
+  # its own TriageAgent CR.
   triage: agentic-triage
-  # Second quarkus-buggy-app, in a namespace labelled sovereign-selfheal.io/data-class=restricted
-  # by the ansible repo: the agent investigates it with the local model only (namespacePolicy).
-  triageRestricted: payments
+  # Monitored application namespaces, each with a quarkus-buggy-app instance and its own
+  # agent (components/triage-agent-operator-cr, one Application per key). Ansible labels
+  # each with sovereign-selfheal.io/data-class, which the router's namespace policy reads.
+  payments: payments
+  rhReserve: rh-reserve
+  reverseProxyApp: reverse-proxy-app
 
 # ----- Observability (traces of the router) --------------------------------------
 # Set by the seed from observability_enabled. true: component observability (Tempo and the
@@ -108,13 +114,25 @@ tiers:
   - name: legal
     tokens: 20000
     window: 5m
-  # Own credential of the triage-agent (components/triage-agent), so its tool-calling loop
-  # (Prometheus + ticketing MCP round trips, several model calls per investigation) has a
-  # budget separate from human tiers above. One SOTA investigation is about 11k SOTA tokens
-  # (5 calls, measured on ocp.8mqfl on 2026-10-06), so 30k SOTA tokens are about 3
-  # investigations in 5 minutes, then local.
-  - name: agents
-    agent: triage-agent
+  # Own credential of each namespace's agent (components/triage-agent-operator-cr), so its
+  # tool-calling loop (Prometheus + ticketing + ocp MCP round trips, several model calls per
+  # investigation) has a budget separate from human tiers above and from the other agents.
+  # One SOTA investigation is about 11k SOTA tokens (5 calls, measured on ocp.8mqfl on
+  # 2026-10-06), so 30k SOTA tokens are about 3 investigations in 5 minutes, then local.
+  # One tier per monitored-application namespace (bootstrap components triage-agent-<ns>,
+  # which override apiKeyTier to the matching name below).
+  - name: agents-payments
+    agent: payments-agent
+    tokens: 200000
+    window: 5m
+    sotaTokens: 30000
+  - name: agents-rh-reserve
+    agent: rh-reserve-agent
+    tokens: 200000
+    window: 5m
+    sotaTokens: 30000
+  - name: agents-reverse-proxy-app
+    agent: reverse-proxy-app-agent
     tokens: 200000
     window: 5m
     sotaTokens: 30000
@@ -357,20 +375,26 @@ components:
     enabled: true
     wave: 3
     namespaceRef: router
-  # AI-driven triage demo: a buggy sample app, a ticketing system it can be reported to,
-  # two MCP tool servers (Prometheus + ticketing), and an agent that ties them together.
-  # Source and images: see AGENTS.md section 3b.
-  quarkus-buggy-app:
-    enabled: true
-    wave: 1
-    namespaceRef: triage
-  # The same chart (key `chart`) in the restricted namespace: the agent investigates this one
-  # with the local model only (namespacePolicy).
-  quarkus-buggy-app-restricted:
+  # AI-driven triage demo: one quarkus-buggy-app and one agent per monitored-application
+  # namespace (payments, rhReserve, reverseProxyApp), plus shared services in the triage
+  # namespace (ticketing system, the three MCP tool servers, and ogx-alert-translator).
+  # Source and images: see AGENTS.md section 4.
+  # Same chart (key `chart`) deployed three times, one per monitored-application namespace.
+  quarkus-buggy-app-payments:
     enabled: true
     chart: quarkus-buggy-app
     wave: 1
-    namespaceRef: triageRestricted
+    namespaceRef: payments
+  quarkus-buggy-app-rh-reserve:
+    enabled: true
+    chart: quarkus-buggy-app
+    wave: 1
+    namespaceRef: rhReserve
+  quarkus-buggy-app-reverse-proxy-app:
+    enabled: true
+    chart: quarkus-buggy-app
+    wave: 1
+    namespaceRef: reverseProxyApp
   ticketing-system:
     enabled: true
     wave: 1
@@ -396,17 +420,40 @@ components:
     # After frontdoor (wave 3): the agent calls router.<appsDomain>, which frontdoor exposes.
     wave: 4
     namespaceRef: triage
-  # One TriageAgent CR (triage.sovereign-selfheal.io/v1alpha1), reconciled by the
-  # triage-agent-operator (separate repo; CRD + operator Deployment are ansible-owned,
-  # see AGENTS.md section 2). Rendered only with triageAgentOperator.enabled.
-  # Both enabled in the same namespace is an error: they create objects with the same names.
-  triage-agent-operator-cr:
+  # One TriageAgent CR (triage.sovereign-selfheal.io/v1alpha1) per monitored-application
+  # namespace, reconciled by the triage-agent-operator (separate repo; CRD + operator
+  # Deployment are ansible-owned, see AGENTS.md section 2). Rendered only with
+  # triageAgentOperator.enabled. The `values` override sets each agent's own router
+  # credential tier (bootstrap/templates/applications.yaml passes it alongside `global`).
+  # MCP server URLs still default to global.namespaces.triage (agentic-triage), where the
+  # shared MCP servers run: these agents call them cross-namespace.
+  # Both a TriageAgent CR and `triage-agent` enabled in the same namespace is an error:
+  # they create objects with the same names.
+  triage-agent-payments:
     enabled: true
+    chart: triage-agent-operator-cr
     wave: 4
-    namespaceRef: triage
+    namespaceRef: payments
+    values:
+      apiKeyTier: agents-payments
+  triage-agent-rh-reserve:
+    enabled: true
+    chart: triage-agent-operator-cr
+    wave: 4
+    namespaceRef: rhReserve
+    values:
+      apiKeyTier: agents-rh-reserve
+  triage-agent-reverse-proxy-app:
+    enabled: true
+    chart: triage-agent-operator-cr
+    wave: 4
+    namespaceRef: reverseProxyApp
+    values:
+      apiKeyTier: agents-reverse-proxy-app
   ogx-alert-translator:
     enabled: true
-    # After triage-agent: forwards Alertmanager webhooks to triage-agent's /trigger on :7860.
+    # After the agents (wave 4): forwards Alertmanager webhooks to the triage-agent Service
+    # of the alert's own namespace, on :7860 (see components/ogx-alert-translator).
     wave: 5
     namespaceRef: triage
   # Live page of the routing decisions and of the namespace labels (repo routing-live-view),

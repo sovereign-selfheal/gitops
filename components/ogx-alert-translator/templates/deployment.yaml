@@ -37,11 +37,16 @@ spec:
           env:
             - name: LOG_LEVEL
               value: INFO
-            # The only outbound dependency: triage-agent's own /trigger endpoint, served
-            # on its existing Service port (7860, shared with the Gradio UI). This service
-            # never talks to OGX, MCP servers, or the router directly — see AGENTS.md.
-            - name: TRIAGE_AGENT_URL
-              value: {{ printf "http://triage-agent.%s.svc:7860" (required "global.namespaces.triage is required" .Values.global.namespaces.triage) | quote }}
+            # The only outbound dependency: an agent's own /trigger endpoint, served on its
+            # existing Service port (7860, shared with the Gradio UI). This service never
+            # talks to OGX, MCP servers, or the router directly — see AGENTS.md. One agent
+            # runs per monitored-application namespace; the translator reads the alert's
+            # `namespace` label and calls http://<TRIAGE_AGENT_SERVICE>.<namespace>.svc:
+            # <TRIAGE_AGENT_PORT>/trigger, so one translator serves every agent.
+            - name: TRIAGE_AGENT_SERVICE
+              value: {{ .Values.triageAgentService | quote }}
+            - name: TRIAGE_AGENT_PORT
+              value: {{ .Values.triageAgentPort | quote }}
             - name: REQUEST_TIMEOUT_SECONDS
               value: {{ .Values.requestTimeoutSeconds | quote }}
             - name: PYTHONUNBUFFERED

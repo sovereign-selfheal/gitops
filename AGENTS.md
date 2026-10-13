@@ -15,8 +15,8 @@ here. After that, Argo CD owns every object described in this repo.
 
 | Owner | Objects |
 |---|---|
-| `ansible` | Operators (including the RHOAI **MCP lifecycle operator**, needed for the `MCPServer` CRs of `components/prometheus-mcp-server`, `components/ticketing-mcp-server` and `components/ocp-mcp-server`, and the **Custom Metrics Autoscaler** (KEDA) with its `KedaController` and HTTP add-on, needed for the `HTTPScaledObject` of `components/ogx-alert-translator`), DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, the metric monitors of Limitador and Authorino, the `TelemetryPolicy` `openshift-ai-inference-labels` (label `tier` on the Limitador counters, read from the `tier` filter of the AuthPolicy `litellm-apikey`: rename both together), GPU nodes, the namespaces `local-models`, `maas-routing`, `agentic-triage` and `payments` (with their `sovereign-selfheal.io/data-class` labels), the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), the model image pre-pull DaemonSets (namespace `sovereign-selfheal-prepull`), the `ClusterRoleBinding` of the `prometheus-mcp-server-sa` ServiceAccount (namespace `agentic-triage`) to the built-in `cluster-monitoring-view` ClusterRole, the `ClusterRoleBinding` of the `ocp-mcp-server-sa` ServiceAccount (namespace `agentic-triage`) to the built-in `view` ClusterRole, the **triage-agent-operator** (`TriageAgent` CRD, controller Deployment in `triage-agent-operator`, cluster RBAC, Argo CD health check for `TriageAgent`), the ClusterRole that reads namespaces (get/list/watch) and its bindings to the `litellm` and `routing-live-view` ServiceAccounts (namespace `maas-routing`, namespace policy of router v0.11.0), the ClusterRole that patches the demo namespaces only and its binding to `routing-live-view`, Argo CD settings, the root Application, the observability operators (OpenTelemetry, Tempo, Cluster Observability), the `UIPlugin` `distributed-tracing`, the Tempo tenant write permission (ClusterRole + binding), the namespace `observability`, user workload monitoring, team access when `team_users` is set (Keycloak in `keycloak` when Ansible installs it, OAuth IdP, `Group/selfheal-team` + ClusterRoleBinding, the Argo CD RBAC line `g, selfheal-team, role:admin`) |
-| `gitops` (this repo) | Every object inside `local-models`, `maas-routing`, `observability`, `agentic-triage` and `payments` (`namespaces.triageRestricted`: the second quarkus-buggy-app and its PrometheusRule). One exception: with `components/triage-agent-operator-cr`, the `TriageAgent` CR is here, but the objects that the triage-agent-operator creates from it (ServiceAccount, Deployment, Service, Route, ConfigMaps) belong to the operator |
+| `ansible` | Operators (including the RHOAI **MCP lifecycle operator**, needed for the `MCPServer` CRs of `components/prometheus-mcp-server`, `components/ticketing-mcp-server` and `components/ocp-mcp-server`, and the **Custom Metrics Autoscaler** (KEDA) with its `KedaController` and HTTP add-on, needed for the `HTTPScaledObject` of `components/ogx-alert-translator`), DataScienceCluster, GatewayClass, Gateway `openshift-ai-inference` (+ its ConfigMap), passthrough `Route/maas-router` (host `router.<appsDomain>`), Kuadrant + Authorino TLS, the metric monitors of Limitador and Authorino, the `TelemetryPolicy` `openshift-ai-inference-labels` (label `tier` on the Limitador counters, read from the `tier` filter of the AuthPolicy `litellm-apikey`: rename both together), GPU nodes, the namespaces `local-models`, `maas-routing`, `agentic-triage`, `payments`, `rh-reserve` and `reverse-proxy-app` (with their `sovereign-selfheal.io/data-class` labels), the ESO operator, the `ClusterSecretStore` and its source Secrets (namespace `sovereign-selfheal-secrets`), the model image pre-pull DaemonSets (namespace `sovereign-selfheal-prepull`), the `ClusterRoleBinding` of the `prometheus-mcp-server-sa` ServiceAccount (namespace `agentic-triage`) to the built-in `cluster-monitoring-view` ClusterRole, the `ClusterRoleBinding` of the `ocp-mcp-server-sa` ServiceAccount (namespace `agentic-triage`) to the built-in `view` ClusterRole, the **triage-agent-operator** (`TriageAgent` CRD, controller Deployment in `triage-agent-operator`, cluster RBAC, Argo CD health check for `TriageAgent`, RBAC in every monitored-application namespace it reconciles a `TriageAgent` CR in), the ClusterRole that reads namespaces (get/list/watch) and its bindings to the `litellm` and `routing-live-view` ServiceAccounts (namespace `maas-routing`, namespace policy of router v0.11.0), the ClusterRole that patches the demo namespaces only and its binding to `routing-live-view`, Argo CD settings, the root Application, the observability operators (OpenTelemetry, Tempo, Cluster Observability), the `UIPlugin` `distributed-tracing`, the Tempo tenant write permission (ClusterRole + binding), the namespace `observability`, user workload monitoring, team access when `team_users` is set (Keycloak in `keycloak` when Ansible installs it, OAuth IdP, `Group/selfheal-team` + ClusterRoleBinding, the Argo CD RBAC line `g, selfheal-team, role:admin`) |
+| `gitops` (this repo) | Every object inside `local-models`, `maas-routing`, `observability`, `agentic-triage`, `payments`, `rh-reserve` and `reverse-proxy-app`. `agentic-triage` holds only the services shared by every agent (`ticketing-system`, the three MCP servers, `ogx-alert-translator`); `payments`, `rh-reserve` and `reverse-proxy-app` (keys `namespaces.payments`, `namespaces.rhReserve`, `namespaces.reverseProxyApp`) are monitored-application namespaces, each with its own `quarkus-buggy-app` and its own agent. One exception: with `components/triage-agent-operator-cr`, the `TriageAgent` CR is here, but the objects that the triage-agent-operator creates from it (ServiceAccount, Deployment, Service, Route, ConfigMaps) belong to the operator |
 
 - **Namespaces** are created by Ansible with the label `argocd.argoproj.io/managed-by: openshift-gitops`.
   The default Argo CD instance can manage only namespaces with this label, and it cannot create Namespaces.
@@ -24,22 +24,34 @@ here. After that, Argo CD owns every object described in this repo.
 - **Values set by the seed** (root Application, `helm.valuesObject`): `appsDomain`, `modelProfile`
   (`gpu` or `cpu`), `sota.enabled`, `sota.apiBase`, `sota.model`, `sota.servedMatch`, `sota.reasoning`, `secretStore.enabled`,
   `classifier.mode` (`local`, `external` or `off`), `observability.enabled`, `namespaces.observability`,
-  `decisionModel.enabled`, `namespacePolicy.scan`, `namespacePolicy.hint`, `namespaces.triageRestricted`, `sotaBudget.enabled`, `triageAgentOperator.enabled`, and optionally `tiers`. With the decision model and managed GPU nodes the seed
+  `decisionModel.enabled`, `namespacePolicy.scan`, `namespacePolicy.hint`, `namespaces.payments`,
+  `namespaces.rhReserve`, `namespaces.reverseProxyApp`, `sotaBudget.enabled`, `triageAgentOperator.enabled`,
+  and optionally `tiers`. With the decision model and managed GPU nodes the seed
   also sets `localModel.profiles.gpu.nodeSelector` to `node-role.kubernetes.io/gpu: ""` (Helm merges it
   with the default `nvidia.com/gpu.present`). Defaults are in `bootstrap/values.yaml`.
+- **Per-component value overrides**: a `components.<name>.values` map in `bootstrap/values.yaml`, if set,
+  is passed to that component's Application alongside `global` (`bootstrap/templates/applications.yaml`).
+  Components still read only `.Values.global` for shared, cluster-wide settings; `values` is for the rare
+  case where the *same chart* is deployed more than once with a different per-instance setting (for
+  example `apiKeyTier` of the three `triage-agent-operator-cr` instances, one per monitored-application
+  namespace). Do not use it to duplicate something `global` already carries.
 - **Decision model** (`decisionModel.enabled`, only with `modelProfile: gpu`): the component `decision-model`
   runs on the `gpu-decision` GPU pool of the ansible repo (node label `node-role.kubernetes.io/gpu-decision`).
   When you change `decisionModel.storageUri` or `.runtimeImage`, update `model_prepull_decision_images` in
   the ansible repo with the same digests.
-- **Tiers**: `tiers` (bootstrap/values.yaml) lists both human API-key tiers (`research`, `legal`) and the
-  `agents` tier used by `components/triage-agent`'s own router credential. Each tier gets a token-budget
-  rule (`TokenRateLimitPolicy`, component `frontdoor`); a component that needs its own credential (because
-  it runs in a different namespace than `components/secrets`) generates its own `Password`/`ExternalSecret`
-  labelled with one of these tier names (see `components/triage-agent/templates/apikey.yaml`). A tier
-  with `sotaTokens` also gets a SOTA token budget in the router (v0.12.0, with `sotaBudget.enabled`): the
-  tiers `agents-critical` (business-critical applications) and `validation` (used by the `validation`
-  repo, check B1) exist for it. The optional `agent` of a tier is the name that the live page
-  `routing-live-view` shows in its column Agent (env `TIER_LABELS`): set it when an agent gets its tier.
+- **Tiers**: `tiers` (bootstrap/values.yaml) lists both human API-key tiers (`research`, `legal`) and one
+  tier per monitored-application agent (`agents-payments`, `agents-rh-reserve`, `agents-reverse-proxy-app`),
+  each used by one `components/triage-agent-operator-cr` instance's own router credential
+  (`values.apiKeyTier` of that instance, see "Per-component value overrides" above). Each tier gets a
+  token-budget rule (`TokenRateLimitPolicy`, component `frontdoor`); a component that needs its own
+  credential (because it runs in a different namespace than `components/secrets`) generates its own
+  `Password`/`ExternalSecret` labelled with one of these tier names (see
+  `components/triage-agent-operator-cr/templates/apikey.yaml`). A tier with `sotaTokens` also gets a SOTA
+  token budget in the router (v0.12.0, with `sotaBudget.enabled`): the per-agent tiers above, plus
+  `agents-critical` (business-critical applications not covered by a dedicated tier) and `validation`
+  (used by the `validation` repo, check B1), exist for it. The optional `agent` of a tier is the name that
+  the live page `routing-live-view` shows in its column Agent (env `TIER_LABELS`): set it when an agent
+  gets its tier.
 - **Observability**: this repo deploys the Tempo instance `tempo` (kind `TempoMonolithic`, multi-tenancy
   `openshift`, tenant `router`) and the OpenTelemetry collector `otel` (kind `OpenTelemetryCollector`; the
   operator names its Service and ServiceAccount `otel-collector`) in the namespace `observability`. OTLP
@@ -88,20 +100,34 @@ These two repos build the custom images and own the router code. The same rules 
 
 ## 4. Contract with the AI-driven triage demo repos
 
-Five repos own the source and the build of the `agentic-triage` namespace workloads (the original demo
-imported from `matteo-grimaldi/ocp-trobleshooter-demo`, plus `ogx-alert-translator`). Unlike `router`,
-none of them has a code-copy contract with this repo: this repo only pins their image digests, same as
-`presidio`.
+Five repos own the source and the build of the AI-driven triage workloads (the original demo
+imported from `matteo-grimaldi/ocp-trobleshooter-demo`, plus `ogx-alert-translator`), split today across
+the shared-services namespace `agentic-triage` and the three monitored-application namespaces
+`payments`, `rh-reserve` and `reverse-proxy-app` (keys `namespaces.triage`, `namespaces.payments`,
+`namespaces.rhReserve`, `namespaces.reverseProxyApp`). Unlike `router`, none of them has a code-copy
+contract with this repo: this repo only pins their image digests, same as `presidio`.
 
 | Owner | Items |
 |---|---|
 | `triage-agent` | Gradio UI (`app.py`, `agent.py`), a thin client of the OGX sidecar's Responses API, image `quay.io/sovereign-selfheal/triage-agent` |
-| `ogx-alert-translator` | FastAPI Alertmanager webhook bridge to the `/trigger` endpoint of triage-agent (see point 5), image `quay.io/sovereign-selfheal/ogx-alert-translator` |
+| `ogx-alert-translator` | FastAPI Alertmanager webhook bridge to the `/trigger` endpoint of the agent of the alert's own namespace (see point 5), image `quay.io/sovereign-selfheal/ogx-alert-translator` |
 | `mock-ticketing-system` | Two subfolders, two images: `ticketing-system` (FastAPI ServiceNow simulator) and `ticketing-mcp-server` (FastMCP wrapper), `quay.io/sovereign-selfheal/ticketing-system` and `quay.io/sovereign-selfheal/ticketing-mcp-server` |
 | `quarkus-buggy-app` | Quarkus 3 source, built with the Jib extension, image `quay.io/sovereign-selfheal/quarkus-buggy-app` |
 | `prometheus-mcp-server` | FastMCP server wrapping PromQL against Thanos, image `quay.io/sovereign-selfheal/prometheus-mcp-server` |
 | `routing-live-view` | Live page of the routing decisions and of the namespace labels (FastAPI, parses the `[policy-router]` log line of the router), image `quay.io/sovereign-selfheal/routing-live-view`; deployed by `components/routing-live-view` in `maas-routing` |
-| `gitops` (this repo) | Every Kubernetes object in `agentic-triage` (`components/quarkus-buggy-app`, `components/ticketing-system`, `components/ticketing-mcp-server`, `components/prometheus-mcp-server`, `components/ocp-mcp-server`, `components/triage-agent`, `components/ogx-alert-translator`, and the `TriageAgent` CR of `components/triage-agent-operator-cr` with its API key; the operator owns the objects it creates from the CR), the image digests in use, including the third-party OGX sidecar image and its `stack_run_config.yaml` (ConfigMap, `components/triage-agent/templates/stack-run-config.yaml`) and per-agent `knowledge.md` (`components/triage-agent/files/knowledge.md`, mounted via ConfigMap; `components/triage-agent-operator-cr/files/knowledge.md` is a checked copy, see `scripts/sync-triage-knowledge.sh`) |
+| `gitops` (this repo) | Every Kubernetes object in `agentic-triage` (`components/ticketing-system`, `components/ticketing-mcp-server`, `components/prometheus-mcp-server`, `components/ocp-mcp-server`, `components/triage-agent` (legacy, disabled), `components/ogx-alert-translator`) and in each of `payments`, `rh-reserve`, `reverse-proxy-app` (one `components/quarkus-buggy-app` instance and one `TriageAgent` CR of `components/triage-agent-operator-cr`, with its own API key, per namespace; the operator owns the objects it creates from each CR, including the stack-run config it builds from the CR spec), the image digests in use, including the third-party OGX sidecar image and the agent's `knowledge.md` (`components/triage-agent-operator-cr/files/knowledge.md`, mounted via ConfigMap, same content in all three namespaces today; a copy of `components/triage-agent/files/knowledge.md`, see `scripts/sync-triage-knowledge.sh`) |
+
+- **MCP servers and ticketing stay shared.** `prometheus-mcp-server`, `ticketing-mcp-server`,
+  `ocp-mcp-server` and `ticketing-system` run once, in `agentic-triage` (`namespaces.triage`), not in each
+  monitored-application namespace. Every agent (one TriageAgent CR per monitored-application namespace)
+  calls them cross-namespace by FQDN (`*.agentic-triage.svc`, see point 3). Do not duplicate these
+  components per application namespace.
+- **One agent per monitored-application namespace.** `components/triage-agent-operator-cr` is deployed
+  once per monitored-application namespace (bootstrap components `triage-agent-payments`,
+  `triage-agent-rh-reserve`, `triage-agent-reverse-proxy-app`), each with its own router credential tier
+  (`values.apiKeyTier`, see §2 "Per-component value overrides" and "Tiers"). All three use the same CR
+  name (`triage-agent`, chart default): ogx-alert-translator relies on that name being equal in every
+  namespace (see point 5).
 
 1. **Images by digest.** Same pin convention as §3: `# tag vX.Y.Z, resolved on quay.io on <date>`. A new
    version is a PR here. The OGX sidecar (`docker.io/ogxai/distribution-starter`) and the Kubernetes-API
@@ -125,21 +151,32 @@ none of them has a code-copy contract with this repo: this repo only pins their 
    empty (no tool). `triage-agent-operator-cr` follows the same rules with `mcpServers.ocp` and
    `mcpServers.ocpUseInClusterService`. Its ServiceAccount `ocp-mcp-server-sa` is bound (ansible repo, §2) to the
    built-in `view` ClusterRole, cluster-wide.
-5. **Alertmanager bridge (`ogx-alert-translator`).** A stateless webhook receiver in
-   `components/ogx-alert-translator` accepts Alertmanager POSTs on `/webhook`, builds a plain-text
-   prompt from the alert labels/annotations, and forwards it to the **existing** triage-agent at
-   `http://triage-agent.<triage-ns>.svc:7860/trigger` (plain JSON `{"input": "<text>"}`). This reuses
-   triage-agent's existing Service port (`7860`, shared with the Gradio UI) — `triage-agent`'s
-   `app.py` mounts Gradio inside a FastAPI app that also serves `/trigger`. **No new Service port
-   and no OGX access** for the translator: it never calls OGX, MCP servers, or the router, and never
-   redefines the system prompt, tool list, or model — that definition lives exactly once, in
-   `triage-agent/agent.py`. Scale-from-zero uses KEDA (`HTTPScaledObject` when the HTTP add-on is
-   installed by Ansible, or optional Prometheus `ScaledObject` in values). No public Route:
-   Alertmanager (or the KEDA HTTP interceptor) calls the cluster Service only.
+5. **Alertmanager bridge (`ogx-alert-translator`).** A single, stateless webhook receiver in
+   `components/ogx-alert-translator` (deployed once, in `agentic-triage`) accepts Alertmanager POSTs on
+   `/webhook`, builds a plain-text prompt from the alert labels/annotations, and forwards it to the
+   agent that runs in the **alert's own namespace** (plain JSON `{"input": "<text>"}`). One agent per
+   monitored-application namespace shares this one translator: the translator does not hardcode a single
+   namespace. It derives the target from the alert's `namespace` label and two env vars,
+   `TRIAGE_AGENT_SERVICE` (default `triage-agent`) and `TRIAGE_AGENT_PORT` (default `7860`):
+   `http://<TRIAGE_AGENT_SERVICE>.<alert namespace>.svc:<TRIAGE_AGENT_PORT>/trigger`. This only works
+   because every TriageAgent CR keeps the same name (`triage-agent`, see point above) — renaming one
+   agent's CR without updating this convention breaks the bridge for that namespace. This reuses the
+   agent's existing Service port (`7860`, shared with the Gradio UI) — `triage-agent`'s `app.py` mounts
+   Gradio inside a FastAPI app that also serves `/trigger`. **No new Service port and no OGX access**
+   for the translator: it never calls OGX, MCP servers, or the router, and never redefines the system
+   prompt, tool list, or model — that definition lives exactly once, per agent, in `triage-agent/agent.py`.
+   Scale-from-zero uses KEDA (`HTTPScaledObject` when the HTTP add-on is installed by Ansible, or
+   optional Prometheus `ScaledObject` in values). No public Route: Alertmanager (or the KEDA HTTP
+   interceptor) calls the cluster Service only.
+   - **One `AlertmanagerConfig` per monitored-application namespace**
+     (`alertmanager.namespaceRefs` of `components/ogx-alert-translator`, keep in sync with
+     `alerts.quarkusBuggyApp.namespaceRefs` of `components/observability`), all routing to the same
+     webhook URL; the translator tells them apart by the alert's `namespace` label, not by a different
+     URL per namespace.
    - **Callers use the interceptor.** With the HTTP add-on, a sender (Alertmanager) must POST to
      `http://keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080/webhook`: the interceptor
      holds the request and KEDA starts the pod. The Service of the translator has no endpoints while
-     it is scaled to zero. Checked on 2026-10-05: HTTP 202 after a 26 s cold start, and triage-agent
+     it is scaled to zero. Checked on 2026-10-05: HTTP 202 after a 26 s cold start, and the agent
      started its run.
    - **No `replicas` with KEDA.** With KEDA on, the Deployment has no `replicas` field: KEDA owns the
      number of pods. With a value in Git, Argo CD (selfHeal) sets it again and stops the pod that KEDA
@@ -147,7 +184,12 @@ none of them has a code-copy contract with this repo: this repo only pins their 
    - **Alertmanager routing.** Ansible sets `alertmanagerMain.enableUserAlertmanagerConfig` in
      `cluster-monitoring-config` (`roles/user_workload_monitoring`, when the KEDA HTTP add-on is on).
      This repo declares the matching `AlertmanagerConfig` in `components/ogx-alert-translator` (webhook
-     to the KEDA interceptor for `QuarkusBuggyAppHighErrorRate` in the triage namespace).
+     to the KEDA interceptor for `QuarkusBuggyAppHighErrorRate`, once per monitored-application
+     namespace).
+   - **Translator code contract.** The `ogx-alert-translator` repo reads `TRIAGE_AGENT_SERVICE` and
+     `TRIAGE_AGENT_PORT` and builds the URL from the alert's `namespace` label, instead of a single
+     fixed `TRIAGE_AGENT_URL`. This is a behaviour change of that repo's code, not only of this repo's
+     objects: bump its version together with this change.
 
 ## 5. Layout
 
