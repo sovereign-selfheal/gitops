@@ -8,8 +8,8 @@ global:
     reverseProxyApp: reverse-proxy-app
 
 # Image of the ogx-alert-translator repo (github.com/sovereign-selfheal/ogx-alert-translator).
-# tag v0.1.0, resolved on quay.io on 2026-10-05
-image: quay.io/sovereign-selfheal/ogx-alert-translator@sha256:b019e5b342d0068c7a86f47952f64f329690db2d49b9ad47af7e1f5ec96817de
+# tag fix_per-namespace-trigger-url, resolved on quay.io on 2026-10-14
+image: quay.io/sovereign-selfheal/ogx-alert-translator@sha256:f7b19de1d88787429ef5f0dfe47d67f16bc481df912678461438868e9cc68e98
 # Used only when KEDA is off (keda.httpAddon.enabled and keda.prometheus.enabled false). With
 # KEDA the Deployment has no replicas field: KEDA owns the number of pods.
 replicas: 0
