@@ -49,8 +49,14 @@ alerts:
     errorRateThreshold: 0.10
     for: 5m
     severity: warning
-    service: quarkus-buggy-app
-    # Namespaces with a quarkus-buggy-app instance (keys of global.namespaces): one per
+    # Service name of the buggy-app instance in each namespace (components/quarkus-buggy-
+    # app `appName`, set per-instance in bootstrap/values.yaml). Keyed by the same
+    # namespaceRefs below.
+    services:
+      payments: payments-buggy-app
+      rhReserve: rh-reserve-buggy-app
+      reverseProxyApp: reverse-proxy-buggy-app
+    # Namespaces with a buggy-app instance (keys of global.namespaces): one per
     # monitored application, each with its own agent. A key without a namespace in
     # global.namespaces is skipped.
     namespaceRefs:

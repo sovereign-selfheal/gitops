@@ -1,24 +1,24 @@
 # User workload monitoring evaluates PrometheusRule objects in the workload namespace.
 # This chart deploys to `observability`, but each rule must live in the namespace of one
-# quarkus-buggy-app instance, so PromQL can use the metrics scraped there (ServiceMonitor in that
+# buggy-app instance, so PromQL can use the metrics scraped there (ServiceMonitor in that
 # namespace). One rule per entry of alerts.quarkusBuggyApp.namespaceRefs (keys of global.namespaces).
 # `sum by (namespace)`: the alert carries the `namespace` label, which ogx-alert-translator passes
 # to triage-agent and the router reads (namespace policy, router v0.11.0).
-{{- $app := .Values.alerts.quarkusBuggyApp.service }}
 {{- $threshold := .Values.alerts.quarkusBuggyApp.errorRateThreshold }}
 {{- range $ref := .Values.alerts.quarkusBuggyApp.namespaceRefs }}
 {{- $ns := required (printf "global.namespaces.%s is required (alerts.quarkusBuggyApp.namespaceRefs)" $ref) (index $.Values.global.namespaces $ref) }}
+{{- $app := required (printf "alerts.quarkusBuggyApp.services.%s is required (alerts.quarkusBuggyApp.namespaceRefs)" $ref) (index $.Values.alerts.quarkusBuggyApp.services $ref) }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: quarkus-buggy-app-error-rate
+  name: {{ $app }}-error-rate
   namespace: {{ $ns }}
   labels:
-    app: quarkus-buggy-app
+    app: {{ $app }}
 spec:
   groups:
-    - name: quarkus-buggy-app
+    - name: {{ $app }}
       rules:
         - alert: QuarkusBuggyAppHighErrorRate
           expr: |

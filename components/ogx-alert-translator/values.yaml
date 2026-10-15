@@ -36,7 +36,7 @@ keda:
 alertmanager:
   alertname: QuarkusBuggyAppHighErrorRate
   webhookUrl: http://keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080/webhook
-  # Keys of global.namespaces with a quarkus-buggy-app instance (one per monitored
+  # Keys of global.namespaces with a buggy-app instance (one per monitored
   # application, each with its own agent). Keep in sync with
   # alerts.quarkusBuggyApp.namespaceRefs of components/observability.
   namespaceRefs:

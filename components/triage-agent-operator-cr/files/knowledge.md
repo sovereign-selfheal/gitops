@@ -1,8 +1,8 @@
-# Application Knowledge Base — quarkus-buggy-app
+# Application Knowledge Base — payments-buggy-app
 
 ## Overview
 
-**Application name:** `quarkus-buggy-app`  
+**Application name:** `payments-buggy-app`  
 **Namespace:** one instance per namespace. Use the namespace of the alert (label `namespace`) or the one named in the question, and put it in place of `<namespace>` in every query and command below. Only when neither gives a namespace, use `agentic-triage` as the fallback instance name.  
 **Technology:** Quarkus 3.8 (Java), RESTEasy Reactive, Micrometer + Prometheus metrics, SmallRye Health  
 **Purpose:** HTTP API for product catalog, orders, and inventory. All HTTP errors, elevated latency, and pod instability are **production incidents** until you have evidence otherwise.
@@ -15,9 +15,9 @@
 
 | Resource | Details |
 |----------|---------|
-| Deployment | `quarkus-buggy-app` in namespace `<namespace>` |
-| Service | `quarkus-buggy-app` port 8080 (HTTP) |
-| Route | `quarkus-buggy-app-<namespace>.<appsDomain>` |
+| Deployment | `payments-buggy-app` in namespace `<namespace>` |
+| Service | `payments-buggy-app` port 8080 (HTTP) |
+| Route | `payments-buggy-app-<namespace>.<appsDomain>` |
 | Replicas | 1 |
 | Container port | 8080 |
 | Health endpoints | `/q/health/live` (liveness), `/q/health/ready` (readiness) |
@@ -117,7 +117,7 @@ Match observed symptoms to one of these entries when the pattern fits. If multip
 
 ## Troubleshooting checklist
 
-When diagnosing `quarkus-buggy-app`:
+When diagnosing `payments-buggy-app`:
 
 1. **Pod phase** — `Running` with 0 restarts is healthy; any other state is a problem
 2. **Prometheus** — run the queries above; note which URIs and status codes are affected

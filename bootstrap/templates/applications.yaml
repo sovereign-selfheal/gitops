@@ -37,7 +37,7 @@ spec:
     repoURL: {{ $.Values.repo.url }}
     targetRevision: {{ $.Values.repo.targetRevision }}
     # `chart` deploys the same component more than once (for example the three
-    # quarkus-buggy-app-* and triage-agent-* instances, one per monitored namespace).
+    # *-buggy-app and triage-agent-* instances, one per monitored namespace).
     path: components/{{ $c.chart | default $name }}
     helm:
       valuesObject:
