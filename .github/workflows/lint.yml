@@ -64,9 +64,11 @@ jobs:
 
       - name: Render and validate (demo agent as a direct Deployment, legacy chart)
         run: |
+          # triageAgentOperator.enabled=false skips every triage-agent-* operator CR instance;
+          # do not --set components.triage-agent-operator-cr (that key no longer exists and would
+          # add a stub component without namespaceRef and break applications.yaml).
           uv run --no-project --with "pyyaml==${PYYAML_VERSION}" scripts/render.sh gpu rendered/legacy-agent \
             --set triageAgentOperator.enabled=false \
-            --set components.triage-agent-operator-cr.enabled=false \
             --set components.triage-agent.enabled=true
           kubeconform -summary -ignore-missing-schemas rendered/legacy-agent/*.yaml
 

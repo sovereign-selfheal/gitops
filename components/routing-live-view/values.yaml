@@ -4,7 +4,9 @@ global:
   namespaces:
     router: maas-routing
     triage: agentic-triage
-    triageRestricted: payments
+    payments: payments
+    rhReserve: rh-reserve
+    reverseProxyApp: reverse-proxy-app
   localModel:
     displayName: Local model
   sota:
@@ -21,10 +23,12 @@ oauthProxyImage: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:c2157a771
 # Only users who can list namespaces open the page (oauth-proxy --openshift-sar): the team
 # (cluster-admin through Group selfheal-team) and the cluster admins.
 accessCheck: '{"resource":"namespaces","verb":"list"}'
-# Demo namespaces shown as cards (keys of global.namespaces), in this order.
+# Demo namespaces shown as cards (keys of global.namespaces), in this order: one per
+# monitored application, each with its own agent.
 demoNamespaceRefs:
-  - triage
-  - triageRestricted
+  - payments
+  - rhReserve
+  - reverseProxyApp
 # Seconds between two reads of the namespace labels (the router reads them every 5 s).
 namespacePollSeconds: 2
 resources:

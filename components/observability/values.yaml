@@ -2,7 +2,9 @@
 global:
   namespaces:
     triage: agentic-triage
-    triageRestricted: payments
+    payments: payments
+    rhReserve: rh-reserve
+    reverseProxyApp: reverse-proxy-app
 
 # The images of Tempo and of the collector come from the Tempo and OpenTelemetry operators,
 # which the ansible repo pins by CSV: a new image version is an operator pin change there.
@@ -48,8 +50,10 @@ alerts:
     for: 5m
     severity: warning
     service: quarkus-buggy-app
-    # Namespaces with a quarkus-buggy-app instance (keys of global.namespaces). A key without a
-    # namespace in global.namespaces is skipped.
+    # Namespaces with a quarkus-buggy-app instance (keys of global.namespaces): one per
+    # monitored application, each with its own agent. A key without a namespace in
+    # global.namespaces is skipped.
     namespaceRefs:
-      - triage
-      - triageRestricted
+      - payments
+      - rhReserve
+      - reverseProxyApp

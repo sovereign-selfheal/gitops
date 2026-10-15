@@ -36,12 +36,19 @@ spec:
   source:
     repoURL: {{ $.Values.repo.url }}
     targetRevision: {{ $.Values.repo.targetRevision }}
-    # `chart` deploys the same component twice (for example quarkus-buggy-app-restricted).
+    # `chart` deploys the same component more than once (for example the three
+    # quarkus-buggy-app-* and triage-agent-* instances, one per monitored namespace).
     path: components/{{ $c.chart | default $name }}
     helm:
       valuesObject:
         global:
           {{- toYaml $global | nindent 10 }}
+        {{- /* Optional per-instance overrides (for example apiKeyTier of a triage-agent-
+               operator-cr deployed to more than one namespace). Components still read only
+               .Values.global from bootstrap, plus this optional top-level override. */ -}}
+        {{- with $c.values }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ required (printf "unknown namespaceRef for %s" $name) (index $.Values.namespaces $c.namespaceRef) }}
