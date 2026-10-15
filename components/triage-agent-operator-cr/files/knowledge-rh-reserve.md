@@ -96,7 +96,7 @@ Match observed symptoms to one of these entries when the pattern fits. If multip
 ### 2. HTTP 503 on GET /api/inventory
 - **Pattern:** HTTP 503 on `/api/inventory` without necessarily a Java stack trace in logs
 - **Likely root cause:** Inventory backend or integration unavailable, or application logic returning unavailable when dependency health check fails
-- **Remediation:** Verify dependency connectivity and credentials; inspect `InventoryResource` and related clients; restore downstream service or fix integration configuration
+- **Remediation:** Verify dependency connectivity and access configuration; inspect `InventoryResource` and related clients; restore downstream service or fix integration configuration
 
 ### 3. High latency on GET /api/orders
 - **Pattern:** HTTP 200 but elevated average or p99 latency on `/api/orders`; outcome may still be `SUCCESS` in metrics
