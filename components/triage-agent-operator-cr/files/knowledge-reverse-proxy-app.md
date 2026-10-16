@@ -11,6 +11,17 @@
 
 ---
 
+## Incident ticket caller
+
+When calling `create_incident`, always set `caller_id` to `triage-agent-<namespace>` —
+substitute `<namespace>` the same way as elsewhere in this document (the alert's
+`namespace` label, the namespace named in the question, or the `agentic-triage`
+fallback). Do not leave `caller_id` at the tool's default (`ocp-troubleshooter`):
+the caller must identify which agent instance opened the ticket. `add_work_note`
+has no `caller_id` field; this only applies to `create_incident`.
+
+---
+
 ## Deployment Topology
 
 | Resource | Details |
