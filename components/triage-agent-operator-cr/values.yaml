@@ -79,9 +79,11 @@ knowledge:
   # from this chart. Takes priority over useDefaultFile.
   existingConfigMap: ''
   # When true (default) and existingConfigMap is empty, inline files/<file> (knowledge.md is
-  # the quarkus-buggy-app runbook, a copy of components/triage-agent/files/knowledge.md) as
-  # spec.knowledge.content; the operator creates and owns the ConfigMap. Set it to false only
-  # together with existingConfigMap.
+  # the payments-buggy-app runbook, a copy of components/triage-agent/files/knowledge.md;
+  # files/knowledge-rh-reserve.md and files/knowledge-reverse-proxy-app.md are copies with
+  # the app's real per-namespace name substituted in, picked by the `file` override of each
+  # of those two bootstrap component instances) as spec.knowledge.content; the operator
+  # creates and owns the ConfigMap. Set it to false only together with existingConfigMap.
   useDefaultFile: true
 
 # Sends the namespaces of the investigation to the router (router v0.11.0+ namespace

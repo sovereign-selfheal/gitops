@@ -38,11 +38,13 @@ namespaces:
   router: maas-routing
   observability: observability
   # Shared AI-driven triage services: ticketing-system, the three MCP servers, and
-  # ogx-alert-translator. No quarkus-buggy-app and no agent live here any more: each
+  # ogx-alert-translator. No buggy app and no agent live here any more: each
   # monitored application has its own namespace (see below) with its own buggy app and
   # its own TriageAgent CR.
   triage: agentic-triage
-  # Monitored application namespaces, each with a quarkus-buggy-app instance and its own
+  # Monitored application namespaces, each with its own buggy-app instance (components/
+  # quarkus-buggy-app, see component keys payments-buggy-app, rh-reserve-buggy-app and
+  # reverse-proxy-buggy-app below) and its own
   # agent (components/triage-agent-operator-cr, one Application per key). Ansible labels
   # each with sovereign-selfheal.io/data-class, which the router's namespace policy reads.
   payments: payments
@@ -375,26 +377,35 @@ components:
     enabled: true
     wave: 3
     namespaceRef: router
-  # AI-driven triage demo: one quarkus-buggy-app and one agent per monitored-application
+  # AI-driven triage demo: one buggy app and one agent per monitored-application
   # namespace (payments, rhReserve, reverseProxyApp), plus shared services in the triage
   # namespace (ticketing system, the three MCP tool servers, and ogx-alert-translator).
   # Source and images: see AGENTS.md section 4.
   # Same chart (key `chart`) deployed three times, one per monitored-application namespace.
-  quarkus-buggy-app-payments:
+  # `values.appName` gives each instance a distinct Deployment/Service/Route/ServiceMonitor
+  # name (and `app` label), so console navigation and dashboards can tell the three apart
+  # instead of showing three identical `quarkus-buggy-app` objects.
+  payments-buggy-app:
     enabled: true
     chart: quarkus-buggy-app
     wave: 1
     namespaceRef: payments
-  quarkus-buggy-app-rh-reserve:
+    values:
+      appName: payments-buggy-app
+  rh-reserve-buggy-app:
     enabled: true
     chart: quarkus-buggy-app
     wave: 1
     namespaceRef: rhReserve
-  quarkus-buggy-app-reverse-proxy-app:
+    values:
+      appName: rh-reserve-buggy-app
+  reverse-proxy-buggy-app:
     enabled: true
     chart: quarkus-buggy-app
     wave: 1
     namespaceRef: reverseProxyApp
+    values:
+      appName: reverse-proxy-buggy-app
   ticketing-system:
     enabled: true
     wave: 1
@@ -429,6 +440,11 @@ components:
   # shared MCP servers run: these agents call them cross-namespace.
   # Both a TriageAgent CR and `triage-agent` enabled in the same namespace is an error:
   # they create objects with the same names.
+  # `values.knowledge.file` picks the per-namespace runbook (components/triage-agent-
+  # operator-cr/files/): the payments instance uses the default knowledge.md (also the
+  # synced copy of components/triage-agent/files/knowledge.md, see
+  # scripts/sync-triage-knowledge.sh); the other two use a copy with the app's real name
+  # (rh-reserve-buggy-app / reverse-proxy-buggy-app) substituted in.
   triage-agent-payments:
     enabled: true
     chart: triage-agent-operator-cr
@@ -443,6 +459,8 @@ components:
     namespaceRef: rhReserve
     values:
       apiKeyTier: agents-rh-reserve
+      knowledge:
+        file: knowledge-rh-reserve.md
   triage-agent-reverse-proxy-app:
     enabled: true
     chart: triage-agent-operator-cr
@@ -450,6 +468,8 @@ components:
     namespaceRef: reverseProxyApp
     values:
       apiKeyTier: agents-reverse-proxy-app
+      knowledge:
+        file: knowledge-reverse-proxy-app.md
   ogx-alert-translator:
     enabled: true
     # After the agents (wave 4): forwards Alertmanager webhooks to the triage-agent Service

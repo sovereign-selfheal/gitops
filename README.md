@@ -39,7 +39,7 @@ Traces and metrics stay in the cluster. See [`docs/observability.md`](docs/obser
 | `ticketing-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR; shared by every agent |
 | `ocp-mcp-server` | `agentic-triage` | 2 | `MCPServer` CR, ServiceAccount (bound by ansible to the built-in `view` ClusterRole), read-only pods/logs/events tools; shared by every agent |
 | `triage-agent` | `agentic-triage` | 4 | Off by default (legacy): ServiceAccount, own tier `ExternalSecret`, Deployment, Service, Route (Gradio chat UI). Use `triage-agent-operator-cr` instead |
-| `quarkus-buggy-app-payments`, `quarkus-buggy-app-rh-reserve`, `quarkus-buggy-app-reverse-proxy-app` | `payments`, `rh-reserve`, `reverse-proxy-app` | 1 | The same chart (`chart: quarkus-buggy-app`), once per monitored-application namespace: Deployment, Service, ServiceMonitor, Route (target of the triage demo, injects random 500s/503s/latency) |
+| `payments-buggy-app`, `rh-reserve-buggy-app`, `reverse-proxy-buggy-app` | `payments`, `rh-reserve`, `reverse-proxy-app` | 1 | The same chart (`chart: quarkus-buggy-app`), once per monitored-application namespace, each with its own `appName` (see "Per-component value overrides" in AGENTS.md): Deployment, Service, ServiceMonitor, Route (target of the triage demo, injects random 500s/503s/latency) |
 | `triage-agent-payments`, `triage-agent-rh-reserve`, `triage-agent-reverse-proxy-app` | `payments`, `rh-reserve`, `reverse-proxy-app` | 4 | The same chart (`chart: triage-agent-operator-cr`), once per monitored-application namespace, each with its own `apiKeyTier` (see "Per-component value overrides" in AGENTS.md): the `TriageAgent` CR and its own tier `ExternalSecret`. The triage-agent-operator (ansible repo) creates the ServiceAccount, Deployment, Service, Route and ConfigMaps from each CR. Never enable `triage-agent` (legacy) in the same namespace as one of these |
 | `ogx-alert-translator` | `agentic-triage` | 5 | ServiceAccount, Deployment (KEDA owns the replicas), Service, `HTTPScaledObject` (KEDA HTTP add-on, 0 to 3 pods), one `AlertmanagerConfig` per monitored-application namespace (webhook to the interceptor for the Quarkus error-rate alert): a single Alertmanager bridge, shared by every agent, that forwards each alert to the `/trigger` endpoint of the agent in the alert's own namespace |
 
@@ -75,7 +75,7 @@ The seed in the `ansible` repo sets these values on the root Application. All th
 | `namespacePolicy.hint` | `false` | `true`: the router reads the namespaces that the agents send, and each agent sends them |
 | `sotaBudget.enabled` | `false` | `true`: SOTA token budget per tier, with a small Redis (router v0.12.0, see "SOTA budget per tier") |
 | `triageAgentOperator.enabled` | `true` | `false`: skip every `triage-agent-operator-cr` instance when the ansible repo did not install the `TriageAgent` CRD and the triage-agent-operator |
-| `namespaces.payments`, `namespaces.rhReserve`, `namespaces.reverseProxyApp` | `payments`, `rh-reserve`, `reverse-proxy-app` | Monitored-application namespaces, each with its own `quarkus-buggy-app` and its own agent |
+| `namespaces.payments`, `namespaces.rhReserve`, `namespaces.reverseProxyApp` | `payments`, `rh-reserve`, `reverse-proxy-app` | Monitored-application namespaces, each with its own buggy app (`payments-buggy-app`, `rh-reserve-buggy-app`, `reverse-proxy-buggy-app`) and its own agent |
 
 ## Observability
 
@@ -279,7 +279,7 @@ its own agent:
                       └── ogx-alert-translator
 
 payments / rh-reserve / reverse-proxy-app (one of each, per namespace)
-  quarkus-buggy-app
+  <namespace>-buggy-app (payments-buggy-app / rh-reserve-buggy-app / reverse-proxy-buggy-app)
   triage-agent (Gradio UI, TriageAgent CR) ──> OGX sidecar (server-side agentic loop, same pod)
                                                   ├──> router.<appsDomain>/v1, model "auto"   (own tier, e.g. "agents-payments")
                                                   ├──> prometheus-mcp-server (MCP, agentic-triage) ──> Thanos Querier
@@ -287,11 +287,12 @@ payments / rh-reserve / reverse-proxy-app (one of each, per namespace)
                                                   └──> ocp-mcp-server (MCP, agentic-triage) ──> Kubernetes API (read-only)
 ```
 
-- **`quarkus-buggy-app`**: a target application that injects random failures (30% `500` on
-  `/api/products`, 40% `503` on `/api/inventory`, 20% 3s latency on `/api/orders`) and generates its own
-  traffic, so error metrics move even without manual requests. One instance per monitored-application
-  namespace (bootstrap components `quarkus-buggy-app-payments`, `quarkus-buggy-app-rh-reserve`,
-  `quarkus-buggy-app-reverse-proxy-app`, same chart).
+- **buggy app** (`components/quarkus-buggy-app` chart): a target application that injects random
+  failures (30% `500` on `/api/products`, 40% `503` on `/api/inventory`, 20% 3s latency on
+  `/api/orders`) and generates its own traffic, so error metrics move even without manual requests. One
+  instance per monitored-application namespace, each with its own `appName` so console navigation and
+  dashboards can tell them apart (bootstrap components `payments-buggy-app`, `rh-reserve-buggy-app`,
+  `reverse-proxy-buggy-app`, same chart).
 - **`ticketing-system`**: a ServiceNow Table API simulator (dashboard at its Route). Runs once, in
   `agentic-triage`, shared by every agent.
 - **`prometheus-mcp-server`** / **`ticketing-mcp-server`**: MCP tool servers (`MCPServer` CR, needs the
@@ -310,7 +311,8 @@ payments / rh-reserve / reverse-proxy-app (one of each, per namespace)
   `agents-rh-reserve`, `agents-reverse-proxy-app`), set with a per-component `values` override in
   `bootstrap/values.yaml` (see `AGENTS.md` §2 "Per-component value overrides"); all three use the same CR
   name (`triage-agent`), so `ogx-alert-translator` can reach any of them by the same convention. Source
-  and images: `triage-agent`, `mock-ticketing-system`, `quarkus-buggy-app`, `prometheus-mcp-server`
+  and images: `triage-agent`, `mock-ticketing-system`, `quarkus-buggy-app` (image name; see
+  `components/quarkus-buggy-app`'s `appName` for the per-instance object names), `prometheus-mcp-server`
   repos (see `AGENTS.md` §4); the OGX sidecar image itself is a third-party image
   (`ogxai/distribution-starter`), pinned by digest in `gitops` only, not built by any of those repos.
 - **`ogx-alert-translator`**: a single Alertmanager webhook bridge (`/webhook`), shared by every agent,

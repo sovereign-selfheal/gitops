@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: quarkus-buggy-app
+  name: {{ .Values.appName }}
   labels:
-    app: quarkus-buggy-app
+    app: {{ .Values.appName }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
-      app: quarkus-buggy-app
+      app: {{ .Values.appName }}
   template:
     metadata:
       labels:
-        app: quarkus-buggy-app
+        app: {{ .Values.appName }}
     spec:
       containers:
-        - name: quarkus-buggy-app
+        - name: {{ .Values.appName }}
           image: {{ .Values.image }}
           imagePullPolicy: IfNotPresent
           ports:
@@ -48,9 +48,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: quarkus-buggy-app
+  name: {{ .Values.appName }}
   labels:
-    app: quarkus-buggy-app
+    app: {{ .Values.appName }}
   annotations:
     # Redundant with the ServiceMonitor below (user workload monitoring uses the
     # ServiceMonitor), kept only for tools that discover targets from Service annotations.
@@ -59,7 +59,7 @@ metadata:
     prometheus.io/port: "8080"
 spec:
   selector:
-    app: quarkus-buggy-app
+    app: {{ .Values.appName }}
   ports:
     - name: http
       port: 8080
@@ -70,13 +70,13 @@ spec:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: quarkus-buggy-app
+  name: {{ .Values.appName }}
   labels:
-    app: quarkus-buggy-app
+    app: {{ .Values.appName }}
 spec:
   to:
     kind: Service
-    name: quarkus-buggy-app
+    name: {{ .Values.appName }}
   port:
     targetPort: http
   tls:
@@ -88,13 +88,13 @@ spec:
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: quarkus-buggy-app
+  name: {{ .Values.appName }}
   labels:
-    app: quarkus-buggy-app
+    app: {{ .Values.appName }}
 spec:
   selector:
     matchLabels:
-      app: quarkus-buggy-app
+      app: {{ .Values.appName }}
   endpoints:
     - port: http
       path: /q/metrics

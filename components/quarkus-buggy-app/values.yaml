@@ -2,6 +2,13 @@
 # `helm lint` works (no key of `global` is read by this component).
 global: {}
 
+# Name of the Deployment, Service, Route and ServiceMonitor, and of the `app` label.
+# This chart is deployed three times (once per monitored-application namespace); bootstrap
+# sets this per-instance (components.<name>.values.appName) so each namespace's app shows
+# a distinct name in console navigation and dashboards instead of three identical
+# `quarkus-buggy-app` objects. Default below is only for `helm lint`.
+appName: quarkus-buggy-app
+
 # Image of the quarkus-buggy-app repo (github.com/sovereign-selfheal/quarkus-buggy-app):
 # Quarkus 3 REST service, built with the Jib extension (no Dockerfile).
 # tag v0.1.2, resolved on quay.io on 2026-10-01
