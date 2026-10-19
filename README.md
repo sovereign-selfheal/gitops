@@ -218,7 +218,7 @@ Application turn the policy on, both off by default:
   and triage-agent sends it (env `ROUTER_NAMESPACE_HINT`; needs a triage-agent version with
   `namespaces` in `/trigger`). The field is removed before any model call.
 
-The alert `QuarkusBuggyAppHighErrorRate` exists once per monitored-application namespace
+The alert `AppHighErrorRate` exists once per monitored-application namespace
 (`alerts.quarkusBuggyApp.namespaceRefs` of the observability component: `payments`, `rh-reserve`,
 `reverse-proxy-app`) and keeps the `namespace` label (`sum by (namespace)`). `ogx-alert-translator`
 reads that label to pick which agent's `/trigger` endpoint to call (see "AI-driven triage demo"). The

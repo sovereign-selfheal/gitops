@@ -29,7 +29,7 @@ its OGX server. The live `triage-agent` was not changed.
 | Step | Result |
 |---|---|
 | Access | No token: HTTP 401. No workspace header: HTTP 400. Write in `payments`: `PERMISSION_DENIED`. The dashboard shows the `agentic-triage` workspace without extra labels |
-| Agent trace | Three real investigations of `QuarkusBuggyAppHighErrorRate`: 36–48 s each, 5–7 LLM turns, 7–9 MCP calls, 60,590–72,957 tokens, one ticket each (`INC0000018`, `INC0000032`, `INC0000033`) |
+| Agent trace | Three real investigations of `AppHighErrorRate`: 36–48 s each, 5–7 LLM turns, 7–9 MCP calls, 60,590–72,957 tokens, one ticket each (`INC0000018`, `INC0000032`, `INC0000033`) |
 | Time split | LLM turns take 2.4–16 s. MCP tool calls take 15–70 ms. On stage, almost all the time is model time |
 | Link to the router | Plain OGX does not forward `traceparent`. OGX started with `opentelemetry-instrument` and `OTEL_*` env (a gitops-only change) sends it: Tempo shows one tree with the OGX call and the router decision |
 | Fail-open | With MLflow unreachable the investigation never waits for MLflow. Numbers in [Findings](#findings-for-the-mvp) |

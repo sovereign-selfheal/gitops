@@ -185,7 +185,7 @@ contract with this repo: this repo only pins their image digests, same as `presi
    - **Alertmanager routing.** Ansible sets `alertmanagerMain.enableUserAlertmanagerConfig` in
      `cluster-monitoring-config` (`roles/user_workload_monitoring`, when the KEDA HTTP add-on is on).
      This repo declares the matching `AlertmanagerConfig` in `components/ogx-alert-translator` (webhook
-     to the KEDA interceptor for `QuarkusBuggyAppHighErrorRate`, once per monitored-application
+     to the KEDA interceptor for `AppHighErrorRate`, once per monitored-application
      namespace).
    - **Translator code contract.** The `ogx-alert-translator` repo reads `TRIAGE_AGENT_SERVICE` and
      `TRIAGE_AGENT_PORT` and builds the URL from the alert's `namespace` label, instead of a single

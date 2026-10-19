@@ -34,7 +34,7 @@ keda:
 # Alertmanager notification routing (merged by platform Alertmanager when ansible sets
 # alertmanagerMain.enableUserAlertmanagerConfig). Only used with the KEDA HTTP add-on.
 alertmanager:
-  alertname: QuarkusBuggyAppHighErrorRate
+  alertname: AppHighErrorRate
   webhookUrl: http://keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080/webhook
   # Keys of global.namespaces with a buggy-app instance (one per monitored
   # application, each with its own agent). Keep in sync with

@@ -5,7 +5,7 @@
 # User-workload alerts are evaluated by Thanos Ruler and delivered to platform Alertmanager
 # (alertmanager-main). Ansible sets alertmanagerMain.enableUserAlertmanagerConfig so this CR is merged.
 # prometheus-operator adds namespace=<CR namespace> to the route (OnNamespace). One CR per demo namespace
-# that fires QuarkusBuggyAppHighErrorRate. Alertmanager POSTs to the KEDA HTTP interceptor.
+# that fires AppHighErrorRate. Alertmanager POSTs to the KEDA HTTP interceptor.
 apiVersion: monitoring.coreos.com/v1beta1
 kind: AlertmanagerConfig
 metadata:
