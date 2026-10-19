@@ -4,6 +4,10 @@
 # namespace). One rule per entry of alerts.quarkusBuggyApp.namespaceRefs (keys of global.namespaces).
 # `sum by (namespace)`: the alert carries the `namespace` label, which ogx-alert-translator passes
 # to triage-agent and the router reads (namespace policy, router v0.11.0).
+# The denominator counts only real HTTP statuses (`status=~"[1-5].."`). The metric of the app also
+# has a series with status="RESET", and its count equals all the other statuses together (checked
+# on ocp.qdb2n on 2026-10-19). With it the 5xx share was about half (0.09-0.16), close to the
+# threshold, so the alert resolved and fired again at random times; without it the share is 0.18-0.33.
 {{- $threshold := .Values.alerts.quarkusBuggyApp.errorRateThreshold }}
 {{- range $ref := .Values.alerts.quarkusBuggyApp.namespaceRefs }}
 {{- $ns := required (printf "global.namespaces.%s is required (alerts.quarkusBuggyApp.namespaceRefs)" $ref) (index $.Values.global.namespaces $ref) }}
@@ -25,7 +29,7 @@ spec:
             (
               sum by (namespace) (rate(http_server_requests_seconds_count{namespace="{{ $ns }}",service="{{ $app }}",status=~"5.."}[5m]))
               /
-              sum by (namespace) (rate(http_server_requests_seconds_count{namespace="{{ $ns }}",service="{{ $app }}"}[5m]))
+              sum by (namespace) (rate(http_server_requests_seconds_count{namespace="{{ $ns }}",service="{{ $app }}",status=~"[1-5].."}[5m]))
             ) > {{ $threshold }}
           for: {{ $.Values.alerts.quarkusBuggyApp.for }}
           labels:
