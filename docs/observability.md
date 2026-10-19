@@ -47,6 +47,14 @@ icon) also has the section *Sovereign Self-Healing demo* with the same trace lin
 (`sovereign-at-a-glance`, component `litellm-router`, only with `observability.enabled`). A few big
 numbers for the time range at the top (default 30 minutes), for the audience of the demo:
 
+- a first row "By agent", for the demo video: where the requests of each agent go. One tile per agent
+  (the namespace of its API-key tier `agents-<namespace>`) in two panels, "Answered in the cluster"
+  (green) and "Sent to the external model" (blue); a tile is grey at 0, so only the agents that went
+  there stand out. Under them, requests per minute by agent and destination, in the same colors;
+- the variable **Agent** at the top selects one or more agents. It filters the row "By agent" and the
+  panels that count requests (share kept in the cluster, sensitive requests, requests per minute).
+  "All" counts every tier, also the keys of people. The token panels, the budget and the GPU stay for
+  all tiers: the LiteLLM token metrics have no tier label;
 - requests kept in the cluster (share), tokens processed in the cluster, tokens sent to the external
   model, sensitive requests kept local (privacy gate), requests over the token budget (429);
 - live: requests and tokens per minute, in the cluster and to the external model; with the `gpu`
