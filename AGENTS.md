@@ -201,6 +201,7 @@ scripts/render.sh     # renders everything like Argo CD does, and checks the con
 scripts/ci-values.yaml
 scripts/sync-router-code.sh  # copies the hook code of the router repo at a tag, and checks the copy
 scripts/sync-triage-knowledge.sh  # copies the triage-agent runbook into the TriageAgent CR chart, and checks it
+scripts/reset-demo-state.sh       # operational: clear demo runtime state on a cluster (not run by Argo CD)
 ```
 
 - The bootstrap chart builds one `global` block (`bootstrap/templates/_helpers.tpl`) and passes it to every

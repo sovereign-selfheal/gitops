@@ -329,6 +329,10 @@ payments / rh-reserve / reverse-proxy-app (one of each, per namespace)
   app starts (`for: 5m` plus the group wait and the cold start of the translator). Then Alertmanager
   sends the alert again every hour (`alertmanager.repeatInterval`), and each agent investigates again.
   To show an investigation at a given moment, start it from the agent's chat UI.
+- **Reset for another recording.** Run `scripts/reset-demo-state.sh` on the cluster (with `oc` logged in).
+  It clears ticketing incidents, Tempo traces, SOTA budgets (Redis restart), router metric counters
+  (LiteLLM restart), and the routing-live-view page. Firing alerts are unchanged; after a reset, start
+  an investigation from an agent chat UI or wait for the hourly Alertmanager repeat.
 
 Try the demo prompts from any agent's chat UI Route, or open an incident manually against the ticketing
 system's `/api/incidents` endpoint and ask the agent of the matching namespace to investigate it.
