@@ -9,6 +9,10 @@
 # big numbers for the time range chosen at the top. The details are in routing-decisions (demo)
 # and stack-operations (team). The numbers use increase() over the time range: a series that
 # starts inside the range (a new pod) misses its first requests, so they are close, not exact.
+# The variable Agent selects the API-key tiers of the agents, one per monitored-application
+# namespace (agents-<namespace>, see `tiers` in bootstrap/values.yaml). It filters the row "By
+# agent" and the panels on router_requests_total. The token panels stay for all tiers: the
+# LiteLLM token metrics have no tier label.
 apiVersion: perses.dev/v1alpha2
 kind: PersesDashboard
 metadata:
@@ -20,7 +24,34 @@ spec:
       description: What stayed in the cluster and what went to the external model, for the time range at the top.
     duration: 30m
     refreshInterval: 15s
+    variables:
+      - kind: ListVariable
+        spec:
+          name: agent
+          display:
+            name: Agent
+            description: Agent of a monitored-application namespace (API-key tier agents-<namespace>)
+          allowAllValue: true
+          allowMultiple: true
+          # "All" keeps every tier, also the keys of people, as the dashboard without the variable.
+          customAllValue: ".*"
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              datasource: {kind: PrometheusDatasource, name: router-prometheus}
+              labelName: team
+              matchers:
+                - {{ printf "router_requests_total{namespace=%q,team=~\"agents-.*\"}" $ns | quote }}
     layouts:
+      # For the demo video: where the requests of each agent go, at a glance.
+      - kind: Grid
+        spec:
+          display:
+            title: By agent
+          items:
+            - {x: 0, "y": 0, width: 12, height: 6, content: {$ref: "#/spec/panels/agentLocal"}}
+            - {x: 12, "y": 0, width: 12, height: 6, content: {$ref: "#/spec/panels/agentSota"}}
+            - {x: 0, "y": 6, width: 24, height: 8, content: {$ref: "#/spec/panels/agentLive"}}
       - kind: Grid
         spec:
           display:
@@ -55,6 +86,72 @@ spec:
             - {x: 15, "y": 0, width: 9, height: 8, content: {$ref: "#/spec/panels/nsLive"}}
       {{- end }}
     panels:
+      {{- /* The requests of the selected agents; label_replace shows the namespace of each agent
+      (agents-<namespace>). The "or" gives a 0 tile to an agent that sent its requests only to the
+      other destination. A tile is grey at 0 and colored from 1 request, so only the agents that went
+      there stand out. */}}
+      {{- $agents := printf "namespace=%q,team=~\"agents-.*\",team=~\"$agent\"" $ns }}
+      {{- range $panel := list (dict "id" "agentLocal" "name" "Answered in the cluster" "where" "answered by the local model" "dest" "routed_to=\"local-fast\"" "color" "#3e8635") (dict "id" "agentSota" "name" "Sent to the external model" "where" "sent to the external model" "dest" "routed_to!=\"local-fast\"" "color" "#0066cc") }}
+      {{ $panel.id }}:
+        kind: Panel
+        spec:
+          display:
+            name: {{ $panel.name }}
+            description: Requests of each agent {{ $panel.where }}, in the selected time range
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last-number
+              format: {unit: decimal, decimalPlaces: 0}
+              colorMode: background_solid
+              legendMode: "on"
+              thresholds:
+                defaultColor: "#d2d2d2"
+                steps:
+                  - {value: 1, color: {{ $panel.color | quote }}}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "label_replace(round(sum by (team) (increase(router_requests_total{%s,%s}[$__range]))) or 0 * sum by (team) (increase(router_requests_total{%s}[$__range])), \"ns\", \"$1\", \"team\", \"agents-(.+)\")" $agents $panel.dest $agents | quote }}
+                    seriesNameFormat: "{{ "{{" }}ns{{ "}}" }}"
+      {{- end }}
+      agentLive:
+        kind: Panel
+        spec:
+          display:
+            name: Requests per minute, by agent and destination
+            description: "Green: answered in the cluster. Blue: sent to the external model."
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend: {position: bottom}
+              yAxis: {format: {unit: decimal, decimalPlaces: 1}}
+              visual: {display: bar, stack: all}
+              # The colors of the counters: green in the cluster, blue outside.
+              querySettings:
+                - {queryIndex: 0, colorMode: fixed, colorValue: "#3e8635"}
+                - {queryIndex: 1, colorMode: fixed, colorValue: "#0066cc"}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "label_replace(sum by (team) (rate(router_requests_total{%s,routed_to=\"local-fast\"}[$__rate_interval])) * 60, \"ns\", \"$1\", \"team\", \"agents-(.+)\")" $agents | quote }}
+                    seriesNameFormat: "{{ "{{" }}ns{{ "}}" }} → in the cluster"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource: {kind: PrometheusDatasource, name: router-prometheus}
+                    query: {{ printf "label_replace(sum by (team) (rate(router_requests_total{%s,routed_to!=\"local-fast\"}[$__rate_interval])) * 60, \"ns\", \"$1\", \"team\", \"agents-(.+)\")" $agents | quote }}
+                    seriesNameFormat: "{{ "{{" }}ns{{ "}}" }} → external model"
       keptShare:
         kind: Panel
         spec:
@@ -75,7 +172,7 @@ spec:
                   kind: PrometheusTimeSeriesQuery
                   spec:
                     datasource: {kind: PrometheusDatasource, name: router-prometheus}
-                    query: {{ printf "100 * sum(increase(router_requests_total{namespace=%q,routed_to=\"local-fast\"}[$__range])) / (sum(increase(router_requests_total{namespace=%q}[$__range])) > 0) or vector(0)" $ns $ns | quote }}
+                    query: {{ printf "100 * sum(increase(router_requests_total{namespace=%q,team=~\"$agent\",routed_to=\"local-fast\"}[$__range])) / (sum(increase(router_requests_total{namespace=%q,team=~\"$agent\"}[$__range])) > 0) or vector(0)" $ns $ns | quote }}
       tokensLocal:
         kind: Panel
         spec:
@@ -138,7 +235,7 @@ spec:
                   kind: PrometheusTimeSeriesQuery
                   spec:
                     datasource: {kind: PrometheusDatasource, name: router-prometheus}
-                    query: {{ printf "round(sum(increase(router_requests_total{namespace=%q,decided_by=\"privacy\"}[$__range]))) or vector(0)" $ns | quote }}
+                    query: {{ printf "round(sum(increase(router_requests_total{namespace=%q,team=~\"$agent\",decided_by=\"privacy\"}[$__range]))) or vector(0)" $ns | quote }}
       refused:
         kind: Panel
         spec:
@@ -178,7 +275,7 @@ spec:
                   kind: PrometheusTimeSeriesQuery
                   spec:
                     datasource: {kind: PrometheusDatasource, name: router-prometheus}
-                    query: {{ printf "sum(rate(router_requests_total{namespace=%q,routed_to=\"local-fast\"}[$__rate_interval])) * 60" $ns | quote }}
+                    query: {{ printf "sum(rate(router_requests_total{namespace=%q,team=~\"$agent\",routed_to=\"local-fast\"}[$__rate_interval])) * 60" $ns | quote }}
                     seriesNameFormat: In the cluster
             - kind: TimeSeriesQuery
               spec:
@@ -186,7 +283,7 @@ spec:
                   kind: PrometheusTimeSeriesQuery
                   spec:
                     datasource: {kind: PrometheusDatasource, name: router-prometheus}
-                    query: {{ printf "sum(rate(router_requests_total{namespace=%q,routed_to!=\"local-fast\"}[$__rate_interval])) * 60" $ns | quote }}
+                    query: {{ printf "sum(rate(router_requests_total{namespace=%q,team=~\"$agent\",routed_to!=\"local-fast\"}[$__rate_interval])) * 60" $ns | quote }}
                     seriesNameFormat: External model
       tokensLive:
         kind: Panel
