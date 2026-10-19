@@ -119,25 +119,27 @@ tiers:
   # Own credential of each namespace's agent (components/triage-agent-operator-cr), so its
   # tool-calling loop (Prometheus + ticketing + ocp MCP round trips, several model calls per
   # investigation) has a budget separate from human tiers above and from the other agents.
-  # One SOTA investigation is about 11k SOTA tokens (5 calls, measured on ocp.8mqfl on
-  # 2026-10-06), so 30k SOTA tokens are about 3 investigations in 5 minutes, then local.
+  # One SOTA investigation is about 30k-40k SOTA tokens (router_sota_tokens_total per tier,
+  # measured on ocp.qdb2n on 2026-10-19), so 80k SOTA tokens are about 2 investigations in
+  # 5 minutes, then local. The router reads the budget before each call, so the last call of a
+  # window can go over it.
   # One tier per monitored-application namespace (bootstrap components triage-agent-<ns>,
   # which override apiKeyTier to the matching name below).
   - name: agents-payments
     agent: payments-agent
     tokens: 200000
     window: 5m
-    sotaTokens: 30000
+    sotaTokens: 80000
   - name: agents-rh-reserve
     agent: rh-reserve-agent
     tokens: 200000
     window: 5m
-    sotaTokens: 30000
+    sotaTokens: 80000
   - name: agents-reverse-proxy-app
     agent: reverse-proxy-app-agent
     tokens: 200000
     window: 5m
-    sotaTokens: 30000
+    sotaTokens: 80000
   # Agents of business-critical applications (one agent per application namespace: set its
   # apiKeyTier to this tier): a larger SOTA budget, about 13 investigations in 5 minutes.
   - name: agents-critical

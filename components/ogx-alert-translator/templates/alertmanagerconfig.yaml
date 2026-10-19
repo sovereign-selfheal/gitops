@@ -16,6 +16,7 @@ metadata:
 spec:
   route:
     receiver: ogx-alert-translator
+    repeatInterval: {{ $.Values.alertmanager.repeatInterval | quote }}
     matchers:
       - name: alertname
         matchType: "="

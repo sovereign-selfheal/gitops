@@ -36,6 +36,10 @@ keda:
 alertmanager:
   alertname: QuarkusBuggyAppHighErrorRate
   webhookUrl: http://keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080/webhook
+  # Alertmanager sends a firing alert again after this time (sendResolved stays false). The apps
+  # of the demo keep failing, so their alerts stay firing: each agent gets a new investigation
+  # about once per interval. Without it the route inherits 12h from the platform Alertmanager.
+  repeatInterval: 1h
   # Keys of global.namespaces with a buggy-app instance (one per monitored
   # application, each with its own agent). Keep in sync with
   # alerts.quarkusBuggyApp.namespaceRefs of components/observability.

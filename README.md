@@ -231,7 +231,7 @@ agent would stay local. Details: router repo, README "Namespace policy" and
 The page `routing-live-view` (Route `routing-live-view-maas-routing.<appsDomain>`, sign-in with the
 cluster users who can list namespaces) shows every decision while it happens, with the agent that asked
 (the `agent` name of its API-key tier in `tiers`, else `<tier> key`) and, for a tier with a SOTA budget,
-a tag such as `SOTA 25k/30k` (red when the budget is used); the labels of the demo namespaces; and a
+a tag such as `SOTA 25k/80k` (red when the budget is used); the labels of the demo namespaces; and a
 button that changes a label: the page checks first, with the token of the signed-in
 user, that this user may patch the namespace, then its ServiceAccount (allowed on the demo namespaces
 only, ansible repo) writes the label.
@@ -246,9 +246,9 @@ the tokens and stays the ceiling, so keep `sotaTokens` below `tokens`.
 
 | Tier | Gateway limit | SOTA budget | Who |
 |---|---|---|---|
-| `agents-payments` | 200k / 5m | 30k / 5m | agent of `payments` (one SOTA investigation is about 11k tokens: about 3 in 5 minutes, then local) |
-| `agents-rh-reserve` | 200k / 5m | 30k / 5m | agent of `rh-reserve` |
-| `agents-reverse-proxy-app` | 200k / 5m | 30k / 5m | agent of `reverse-proxy-app` |
+| `agents-payments` | 200k / 5m | 80k / 5m | agent of `payments` (one SOTA investigation is about 30k-40k tokens: about 2 in 5 minutes, then local) |
+| `agents-rh-reserve` | 200k / 5m | 80k / 5m | agent of `rh-reserve` |
+| `agents-reverse-proxy-app` | 200k / 5m | 80k / 5m | agent of `reverse-proxy-app` |
 | `agents-critical` | 600k / 5m | 150k / 5m | agents of business-critical applications not covered by a dedicated tier above (set their `apiKeyTier`): about 13 investigations in 5 minutes |
 | `validation` | 100k / 5m | 1 | the validation repo (check B1: its second SOTA request stays local) |
 
@@ -323,6 +323,12 @@ payments / rh-reserve / reverse-proxy-app (one of each, per namespace)
   (`keda-add-ons-http-interceptor-proxy.openshift-keda.svc:8080`, see `AGENTS.md` §4). Ansible
   enables `alertmanagerMain.enableUserAlertmanagerConfig`; this repo adds one `AlertmanagerConfig` per
   monitored-application namespace, all pointing to the same translator.
+- **Timing of the alert path.** The rule fires after 5 minutes with more than 10% HTTP 5xx (the share
+  counts only real HTTP statuses, not the series `status="RESET"`). The apps of the demo keep failing,
+  so the alert stays firing. The first investigation of each agent starts about 5.5 minutes after its
+  app starts (`for: 5m` plus the group wait and the cold start of the translator). Then Alertmanager
+  sends the alert again every hour (`alertmanager.repeatInterval`), and each agent investigates again.
+  To show an investigation at a given moment, start it from the agent's chat UI.
 
 Try the demo prompts from any agent's chat UI Route, or open an incident manually against the ticketing
 system's `/api/incidents` endpoint and ask the agent of the matching namespace to investigate it.
