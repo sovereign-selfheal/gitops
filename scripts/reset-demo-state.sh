@@ -18,7 +18,7 @@
 #   - To investigate on your own schedule, use an agent chat UI Route instead of waiting.
 #
 # Usage:
-#   scripts/reset-dashboards.sh [--dry-run] [--yes]
+#   scripts/reset-demo-state.sh [--dry-run] [--yes]
 #
 # Env overrides (defaults match bootstrap/values.yaml `namespaces`):
 #   TRIAGE_NS   (default: agentic-triage)
@@ -49,7 +49,7 @@ for arg in "$@"; do
   esac
 done
 
-log() { printf '[reset-dashboards] %s\n' "$*"; }
+log() { printf '[reset-demo-state] %s\n' "$*"; }
 
 # Runs a mutating command, or just prints it in --dry-run mode.
 run() {
@@ -75,6 +75,10 @@ require_oc() {
 confirm() {
   [ "$ASSUME_YES" -eq 1 ] && return 0
   [ "$DRY_RUN" -eq 1 ] && return 0
+  local user server
+  user=$(oc whoami)
+  server=$(oc whoami --show-server)
+  printf 'Cluster: %s (user %s)\n' "$server" "$user"
   printf 'This deletes ticketing data and traces and restarts the router, Redis, and live view. Continue? [y/N] '
   read -r reply
   case "$reply" in
