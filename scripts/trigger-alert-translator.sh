@@ -141,8 +141,9 @@ post_webhook() {
   oc run "$pod_name" --rm -i --restart=Never -n "$CURL_POD_NAMESPACE" \
     --image=curlimages/curl:latest \
     --env="PAYLOAD_B64=${payload_b64}" \
+    --env="KEDA_WEBHOOK_URL=${KEDA_WEBHOOK_URL}" \
     --command -- sh -c \
-    'echo "$PAYLOAD_B64" | base64 -d | curl -sS -w "\nHTTP %{http_code}\n" -X POST "'"${KEDA_WEBHOOK_URL}"'" -H "Content-Type: application/json" -d @-'
+    'echo "$PAYLOAD_B64" | base64 -d | curl -sS -w "\nHTTP %{http_code}\n" -X POST "$KEDA_WEBHOOK_URL" -H "Content-Type: application/json" -d @-'
 }
 
 run_target() {
