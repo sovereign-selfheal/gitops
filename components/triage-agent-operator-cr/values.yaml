@@ -21,8 +21,8 @@ name: triage-agent
 # values.yaml and the operator's own built-in defaults (triage-agent-operator
 # app/config.py); set here explicitly so a bump is one PR in this repo, same as every
 # other component.
-# tag v0.2.0, resolved on quay.io on 2026-10-04
-image: quay.io/sovereign-selfheal/triage-agent@sha256:a8340b5c1b4006dc8418a8c2646caeaf03e3bb52bad41e2830895a32605b7781
+# tag latest, resolved on quay.io on 2026-10-21
+image: quay.io/sovereign-selfheal/triage-agent@sha256:d666f8ace20744b57e324b49c4f86848fb904d4f8b50e149ab33b509ad7f9d8c
 # tag latest, resolved on docker.io on 2026-09-29
 ogxImage: docker.io/ogxai/distribution-starter@sha256:9d6afd54417bee1f37768a054e198becfadbed21d270d8ec1cdfb699e35e9924
 
