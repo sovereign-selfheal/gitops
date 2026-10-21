@@ -9,8 +9,8 @@ global:
 # Image of the triage-agent repo (github.com/sovereign-selfheal/triage-agent): Gradio UI,
 # talking to the OGX sidecar's Responses API (see AGENTS.md section 3b). The agentic loop
 # itself (tool calling, MCP orchestration) runs server-side in the ogx-server container.
-# tag v0.2.0, resolved on quay.io on 2026-10-04
-image: quay.io/sovereign-selfheal/triage-agent@sha256:a8340b5c1b4006dc8418a8c2646caeaf03e3bb52bad41e2830895a32605b7781
+# tag latest, resolved on quay.io on 2026-10-21
+image: quay.io/sovereign-selfheal/triage-agent@sha256:d666f8ace20744b57e324b49c4f86848fb904d4f8b50e149ab33b509ad7f9d8c
 replicas: 1
 
 # OGX sidecar (ogxai/distribution-starter, upstream project, not a sovereign-selfheal repo:
